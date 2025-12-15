@@ -3,6 +3,8 @@
 ![.NET](https://img.shields.io/badge/.NET-9.0-512BD4)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Build Status](https://github.com/QuinntyneBrown/AWSSDK.Extensions/workflows/PR%20Tests/badge.svg)
+![NuGet](https://img.shields.io/nuget/v/AWSSDK.Extensions.svg)
+![NuGet Downloads](https://img.shields.io/nuget/dt/AWSSDK.Extensions.svg)
 
 A powerful extension library for AWS SDK that provides local Couchbase Lite implementations of Amazon S3 interfaces. This library enables offline-first development and testing scenarios without requiring AWS infrastructure.
 
@@ -216,6 +218,9 @@ Contributions are welcome! Please ensure:
 2. Add tests for new functionality
 3. Follow the existing code style
 4. Update documentation as needed
+5. Update CHANGELOG.md with your changes
+
+For information about versioning and releasing new versions, see [docs/NUGET.md](docs/NUGET.md).
 
 ## Use Cases
 

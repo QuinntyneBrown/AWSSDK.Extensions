@@ -5,7 +5,26 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <NoWarn>1998,4014,,SA1101,SA1600,,SA1200,SA1633,1591,SA1309</NoWarn>
+    
+    <!-- NuGet Package Configuration -->
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>AWSSDK.Extensions</PackageId>
+    <Title>AWSSDK Extensions - Local S3 Implementation</Title>
+    <Description>A powerful extension library for AWS SDK that provides local Couchbase Lite implementations of Amazon S3 interfaces. Enables offline-first development and testing scenarios without requiring AWS infrastructure. Includes transactional support for atomic multi-object operations.</Description>
+    <PackageTags>AWS;S3;Couchbase;Local;Testing;Development;Offline;Extensions;Amazon;SDK</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Initial release with full S3 interface implementation using Couchbase Lite. Supports bucket and object operations, metadata, transactions, and offline-first development.</PackageReleaseNotes>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="\" />
+    <None Include="../../CHANGELOG.md" Pack="true" PackagePath="\" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AWSSDK.S3" Version="3.7.403.10" />
