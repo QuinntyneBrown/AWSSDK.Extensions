@@ -1,0 +1,19 @@
+<Project>
+  <PropertyGroup>
+    <!-- Centralized Version Management -->
+    <VersionPrefix>1.0.0</VersionPrefix>
+    <VersionSuffix></VersionSuffix>
+    
+    <!-- Common Package Properties -->
+    <Authors>Quinntyne Brown</Authors>
+    <Company>Quinntyne Brown</Company>
+    <Copyright>Copyright (c) 2024 Quinntyne Brown</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/QuinntyneBrown/AWSSDK.Extensions</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    
+    <!-- Build Configuration -->
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>
