@@ -177,7 +177,7 @@ cd /tmp/test-package
 dotnet new console
 
 # Add the local package
-dotnet add package AWSSDK.Extensions --source /path/to/AWSSDK.Extensions/src/AWSSDK.Extensions/bin/Release
+dotnet add package AWSSDK.Extensions --source <path-to-repo>/src/AWSSDK.Extensions/bin/Release
 
 # Test the functionality
 dotnet run

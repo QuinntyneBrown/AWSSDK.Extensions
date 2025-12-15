@@ -16,7 +16,8 @@ CHANGELOG_FILE="CHANGELOG.md"
 
 # Function to extract current version
 get_current_version() {
-    grep -oP '<VersionPrefix>\K[^<]+' "$PROPS_FILE"
+    # Use sed for better cross-platform compatibility
+    sed -n 's/.*<VersionPrefix>\([^<]*\)<\/VersionPrefix>.*/\1/p' "$PROPS_FILE" | head -1
 }
 
 # Function to increment version
