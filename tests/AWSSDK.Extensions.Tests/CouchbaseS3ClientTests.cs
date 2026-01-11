@@ -1790,4 +1790,273 @@ public class CouchbaseS3ClientTests
     }
 
     #endregion
+
+    #region ACL and Policy Tests
+
+    [Test]
+    public async Task GetACL_Bucket_ReturnsDefaultACL()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+
+        // Act
+        var response = await _client.GetACLAsync("test-bucket");
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.AccessControlList, Is.Not.Null);
+        Assert.That(response.AccessControlList.Owner, Is.Not.Null);
+        Assert.That(response.AccessControlList.Grants.Count, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public async Task GetACL_Object_ReturnsDefaultACL()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes("test content"));
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            InputStream = stream
+        });
+
+        // Act
+        var response = await _client.GetACLAsync(new GetACLRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key"
+        });
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.AccessControlList, Is.Not.Null);
+    }
+
+    [Test]
+    public void GetACL_NonExistentBucket_ThrowsException()
+    {
+        // Act & Assert
+        var ex = Assert.ThrowsAsync<Amazon.S3.AmazonS3Exception>(
+            async () => await _client.GetACLAsync("non-existent-bucket"));
+
+        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        Assert.That(ex.ErrorCode, Is.EqualTo("NoSuchBucket"));
+    }
+
+    [Test]
+    public async Task PutACL_SetsACLSuccessfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+
+        var request = new PutACLRequest
+        {
+            BucketName = "test-bucket",
+            CannedACL = S3CannedACL.PublicRead
+        };
+
+        // Act
+        var response = await _client.PutACLAsync(request);
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task PutBucketPolicy_SetsPolicy_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        var policy = @"{""Version"":""2012-10-17"",""Statement"":[{""Effect"":""Allow"",""Principal"":""*"",""Action"":""s3:GetObject"",""Resource"":""arn:aws:s3:::test-bucket/*""}]}";
+
+        // Act
+        var response = await _client.PutBucketPolicyAsync("test-bucket", policy);
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GetBucketPolicy_ReturnsPolicy_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        var policy = @"{""Version"":""2012-10-17"",""Statement"":[]}";
+        await _client.PutBucketPolicyAsync("test-bucket", policy);
+
+        // Act
+        var response = await _client.GetBucketPolicyAsync("test-bucket");
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.Policy, Is.EqualTo(policy));
+    }
+
+    [Test]
+    public void GetBucketPolicy_NoPolicySet_ThrowsException()
+    {
+        // Arrange
+        _client.PutBucketAsync("test-bucket").Wait();
+
+        // Act & Assert
+        var ex = Assert.ThrowsAsync<Amazon.S3.AmazonS3Exception>(
+            async () => await _client.GetBucketPolicyAsync("test-bucket"));
+
+        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        Assert.That(ex.ErrorCode, Is.EqualTo("NoSuchBucketPolicy"));
+    }
+
+    [Test]
+    public async Task DeleteBucketPolicy_RemovesPolicy_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        var policy = @"{""Version"":""2012-10-17"",""Statement"":[]}";
+        await _client.PutBucketPolicyAsync("test-bucket", policy);
+
+        // Act
+        var response = await _client.DeleteBucketPolicyAsync("test-bucket");
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+
+        // Verify policy is deleted
+        var ex = Assert.ThrowsAsync<Amazon.S3.AmazonS3Exception>(
+            async () => await _client.GetBucketPolicyAsync("test-bucket"));
+        Assert.That(ex!.ErrorCode, Is.EqualTo("NoSuchBucketPolicy"));
+    }
+
+    [Test]
+    public void PutBucketPolicy_InvalidJSON_ThrowsException()
+    {
+        // Arrange
+        _client.PutBucketAsync("test-bucket").Wait();
+        var invalidPolicy = "not valid json";
+
+        // Act & Assert
+        var ex = Assert.ThrowsAsync<Amazon.S3.AmazonS3Exception>(
+            async () => await _client.PutBucketPolicyAsync("test-bucket", invalidPolicy));
+
+        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(ex.ErrorCode, Is.EqualTo("MalformedPolicy"));
+    }
+
+    [Test]
+    public async Task PutPublicAccessBlock_SetsConfiguration_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+
+        var request = new PutPublicAccessBlockRequest
+        {
+            BucketName = "test-bucket",
+            PublicAccessBlockConfiguration = new PublicAccessBlockConfiguration
+            {
+                BlockPublicAcls = true,
+                IgnorePublicAcls = true,
+                BlockPublicPolicy = true,
+                RestrictPublicBuckets = true
+            }
+        };
+
+        // Act
+        var response = await _client.PutPublicAccessBlockAsync(request);
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GetPublicAccessBlock_ReturnsConfiguration_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutPublicAccessBlockAsync(new PutPublicAccessBlockRequest
+        {
+            BucketName = "test-bucket",
+            PublicAccessBlockConfiguration = new PublicAccessBlockConfiguration
+            {
+                BlockPublicAcls = true,
+                IgnorePublicAcls = false,
+                BlockPublicPolicy = true,
+                RestrictPublicBuckets = false
+            }
+        });
+
+        // Act
+        var response = await _client.GetPublicAccessBlockAsync(new GetPublicAccessBlockRequest
+        {
+            BucketName = "test-bucket"
+        });
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.PublicAccessBlockConfiguration, Is.Not.Null);
+        Assert.That(response.PublicAccessBlockConfiguration.BlockPublicAcls, Is.True);
+        Assert.That(response.PublicAccessBlockConfiguration.IgnorePublicAcls, Is.False);
+        Assert.That(response.PublicAccessBlockConfiguration.BlockPublicPolicy, Is.True);
+        Assert.That(response.PublicAccessBlockConfiguration.RestrictPublicBuckets, Is.False);
+    }
+
+    [Test]
+    public void GetPublicAccessBlock_NoConfigSet_ThrowsException()
+    {
+        // Arrange
+        _client.PutBucketAsync("test-bucket").Wait();
+
+        // Act & Assert
+        var ex = Assert.ThrowsAsync<Amazon.S3.AmazonS3Exception>(
+            async () => await _client.GetPublicAccessBlockAsync(new GetPublicAccessBlockRequest
+            {
+                BucketName = "test-bucket"
+            }));
+
+        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        Assert.That(ex.ErrorCode, Is.EqualTo("NoSuchPublicAccessBlockConfiguration"));
+    }
+
+    [Test]
+    public async Task DeletePublicAccessBlock_RemovesConfiguration_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutPublicAccessBlockAsync(new PutPublicAccessBlockRequest
+        {
+            BucketName = "test-bucket",
+            PublicAccessBlockConfiguration = new PublicAccessBlockConfiguration
+            {
+                BlockPublicAcls = true
+            }
+        });
+
+        // Act
+        var response = await _client.DeletePublicAccessBlockAsync(new DeletePublicAccessBlockRequest
+        {
+            BucketName = "test-bucket"
+        });
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+
+        // Verify configuration is deleted
+        var ex = Assert.ThrowsAsync<Amazon.S3.AmazonS3Exception>(
+            async () => await _client.GetPublicAccessBlockAsync(new GetPublicAccessBlockRequest
+            {
+                BucketName = "test-bucket"
+            }));
+        Assert.That(ex!.ErrorCode, Is.EqualTo("NoSuchPublicAccessBlockConfiguration"));
+    }
+
+    #endregion
 }

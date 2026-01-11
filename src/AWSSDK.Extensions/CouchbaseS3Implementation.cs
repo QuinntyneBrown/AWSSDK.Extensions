@@ -1745,11 +1745,53 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<DeleteBucketOwnershipControlsResponse> DeleteBucketOwnershipControlsAsync(DeleteBucketOwnershipControlsRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<DeleteBucketPolicyResponse> DeleteBucketPolicyAsync(string bucketName, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Deletes the policy associated with the specified bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the delete operation.</returns>
+    public async Task<DeleteBucketPolicyResponse> DeleteBucketPolicyAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        var request = new DeleteBucketPolicyRequest { BucketName = bucketName };
+        return await DeleteBucketPolicyAsync(request, cancellationToken);
+    }
 
-    public Task<DeleteBucketPolicyResponse> DeleteBucketPolicyAsync(DeleteBucketPolicyRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Deletes the policy associated with the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the delete operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<DeleteBucketPolicyResponse> DeleteBucketPolicyAsync(DeleteBucketPolicyRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDocId = $"bucket::{request.BucketName}";
+            var bucketDoc = _database.GetDocument(bucketDocId);
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            // Remove the policy from the bucket document
+            using (var mutableDoc = bucketDoc.ToMutable())
+            {
+                mutableDoc.Remove("policy");
+                _database.Save(mutableDoc);
+            }
+
+            return new DeleteBucketPolicyResponse
+            {
+                HttpStatusCode = HttpStatusCode.NoContent
+            };
+        }, cancellationToken);
+    }
 
     public Task<DeleteBucketReplicationResponse> DeleteBucketReplicationAsync(DeleteBucketReplicationRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
@@ -1781,17 +1823,142 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<DeleteObjectTaggingResponse> DeleteObjectTaggingAsync(DeleteObjectTaggingRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<DeletePublicAccessBlockResponse> DeletePublicAccessBlockAsync(DeletePublicAccessBlockRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Deletes the public access block configuration for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the delete operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<DeletePublicAccessBlockResponse> DeletePublicAccessBlockAsync(DeletePublicAccessBlockRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDocId = $"bucket::{request.BucketName}";
+            var bucketDoc = _database.GetDocument(bucketDocId);
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            using (var mutableDoc = bucketDoc.ToMutable())
+            {
+                mutableDoc.Remove("publicAccessBlock");
+                _database.Save(mutableDoc);
+            }
+
+            return new DeletePublicAccessBlockResponse
+            {
+                HttpStatusCode = HttpStatusCode.NoContent
+            };
+        }, cancellationToken);
+    }
 
     public void EnsureBucketExists(string bucketName)
         => throw new NotImplementedException();
 
-    public Task<GetACLResponse> GetACLAsync(string bucketName, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Gets the access control list (ACL) for a bucket or object.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the ACL.</returns>
+    public async Task<GetACLResponse> GetACLAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        var request = new GetACLRequest { BucketName = bucketName };
+        return await GetACLAsync(request, cancellationToken);
+    }
 
-    public Task<GetACLResponse> GetACLAsync(GetACLRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Gets the access control list (ACL) for a bucket or object.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name and optional key.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the ACL with grants and owner information.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket or object does not exist.</exception>
+    public async Task<GetACLResponse> GetACLAsync(GetACLRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            Document? doc;
+            if (!string.IsNullOrEmpty(request.Key))
+            {
+                // Object ACL
+                doc = _database.GetDocument($"object::{request.BucketName}::{request.Key}");
+                if (doc == null)
+                {
+                    throw new AmazonS3Exception("Object does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchKey"
+                    };
+                }
+            }
+            else
+            {
+                // Bucket ACL
+                doc = _database.GetDocument($"bucket::{request.BucketName}");
+                if (doc == null)
+                {
+                    throw new AmazonS3Exception("Bucket does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchBucket"
+                    };
+                }
+            }
+
+            // Get stored ACL or return default private ACL
+            var acl = new S3AccessControlList();
+            var owner = new Owner
+            {
+                Id = doc.GetString("ownerId") ?? "local-user",
+                DisplayName = doc.GetString("ownerDisplayName") ?? "Local User"
+            };
+            acl.Owner = owner;
+
+            // Check for stored grants
+            var grantsArray = doc.GetArray("grants");
+            if (grantsArray != null)
+            {
+                foreach (var grantDict in grantsArray)
+                {
+                    if (grantDict is DictionaryObject grantDictObj)
+                    {
+                        var grant = new S3Grant
+                        {
+                            Permission = new S3Permission(grantDictObj.GetString("permission") ?? "FULL_CONTROL"),
+                            Grantee = new S3Grantee
+                            {
+                                CanonicalUser = grantDictObj.GetString("granteeId"),
+                                DisplayName = grantDictObj.GetString("granteeDisplayName")
+                            }
+                        };
+                        acl.Grants.Add(grant);
+                    }
+                }
+            }
+            else
+            {
+                // Default: owner has full control
+                acl.Grants.Add(new S3Grant
+                {
+                    Permission = S3Permission.FULL_CONTROL,
+                    Grantee = new S3Grantee { CanonicalUser = owner.Id, DisplayName = owner.DisplayName }
+                });
+            }
+
+            return new GetACLResponse
+            {
+                AccessControlList = acl,
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<GetBucketAccelerateConfigurationResponse> GetBucketAccelerateConfigurationAsync(string bucketName, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
@@ -1835,11 +2002,56 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<GetBucketOwnershipControlsResponse> GetBucketOwnershipControlsAsync(GetBucketOwnershipControlsRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<GetBucketPolicyResponse> GetBucketPolicyAsync(string bucketName, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Gets the bucket policy for the specified bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the bucket policy as a JSON string.</returns>
+    public async Task<GetBucketPolicyResponse> GetBucketPolicyAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        var request = new GetBucketPolicyRequest { BucketName = bucketName };
+        return await GetBucketPolicyAsync(request, cancellationToken);
+    }
 
-    public Task<GetBucketPolicyResponse> GetBucketPolicyAsync(GetBucketPolicyRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Gets the bucket policy for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the bucket policy as a JSON string.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist or has no policy.</exception>
+    public async Task<GetBucketPolicyResponse> GetBucketPolicyAsync(GetBucketPolicyRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDoc = _database.GetDocument($"bucket::{request.BucketName}");
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            var policy = bucketDoc.GetString("policy");
+            if (string.IsNullOrEmpty(policy))
+            {
+                throw new AmazonS3Exception("The bucket policy does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucketPolicy"
+                };
+            }
+
+            return new GetBucketPolicyResponse
+            {
+                Policy = policy,
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<GetBucketPolicyStatusResponse> GetBucketPolicyStatusAsync(GetBucketPolicyStatusRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
@@ -2068,8 +2280,52 @@ public class CouchbaseS3Client : IAmazonS3
 
     #endregion
 
-    public Task<GetPublicAccessBlockResponse> GetPublicAccessBlockAsync(GetPublicAccessBlockRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Gets the public access block configuration for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the public access block configuration.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist or has no public access block configuration.</exception>
+    public async Task<GetPublicAccessBlockResponse> GetPublicAccessBlockAsync(GetPublicAccessBlockRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDoc = _database.GetDocument($"bucket::{request.BucketName}");
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            var publicAccessBlockDict = bucketDoc.GetDictionary("publicAccessBlock");
+            if (publicAccessBlockDict == null)
+            {
+                throw new AmazonS3Exception("The public access block configuration was not found")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchPublicAccessBlockConfiguration"
+                };
+            }
+
+            var config = new PublicAccessBlockConfiguration
+            {
+                BlockPublicAcls = publicAccessBlockDict.GetBoolean("blockPublicAcls"),
+                IgnorePublicAcls = publicAccessBlockDict.GetBoolean("ignorePublicAcls"),
+                BlockPublicPolicy = publicAccessBlockDict.GetBoolean("blockPublicPolicy"),
+                RestrictPublicBuckets = publicAccessBlockDict.GetBoolean("restrictPublicBuckets")
+            };
+
+            return new GetPublicAccessBlockResponse
+            {
+                PublicAccessBlockConfiguration = config,
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     /// <summary>
     /// Initiates a multipart upload for a large object.
@@ -2390,8 +2646,92 @@ public class CouchbaseS3Client : IAmazonS3
     public void MakeObjectPublic(string bucketName, string objectKey, bool enable)
         => throw new NotImplementedException();
 
-    public Task<PutACLResponse> PutACLAsync(PutACLRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Sets the access control list (ACL) for a bucket or object.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name, optional key, and ACL.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating success.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket or object does not exist.</exception>
+    public async Task<PutACLResponse> PutACLAsync(PutACLRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            string docId;
+            Document? existingDoc;
+
+            if (!string.IsNullOrEmpty(request.Key))
+            {
+                // Object ACL
+                docId = $"object::{request.BucketName}::{request.Key}";
+                existingDoc = _database.GetDocument(docId);
+                if (existingDoc == null)
+                {
+                    throw new AmazonS3Exception("Object does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchKey"
+                    };
+                }
+            }
+            else
+            {
+                // Bucket ACL
+                docId = $"bucket::{request.BucketName}";
+                existingDoc = _database.GetDocument(docId);
+                if (existingDoc == null)
+                {
+                    throw new AmazonS3Exception("Bucket does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchBucket"
+                    };
+                }
+            }
+
+            var mutableDoc = existingDoc.ToMutable();
+
+            // Handle canned ACL
+            if (request.CannedACL != null)
+            {
+                mutableDoc.SetString("cannedACL", request.CannedACL.Value);
+            }
+
+            // Handle explicit ACL
+            if (request.AccessControlList != null)
+            {
+                if (request.AccessControlList.Owner != null)
+                {
+                    mutableDoc.SetString("ownerId", request.AccessControlList.Owner.Id);
+                    mutableDoc.SetString("ownerDisplayName", request.AccessControlList.Owner.DisplayName);
+                }
+
+                var grantsArray = new MutableArrayObject();
+                foreach (var grant in request.AccessControlList.Grants)
+                {
+                    var grantDict = new MutableDictionaryObject();
+                    grantDict.SetString("permission", grant.Permission?.Value);
+                    if (grant.Grantee != null)
+                    {
+                        grantDict.SetString("granteeId", grant.Grantee.CanonicalUser);
+                        grantDict.SetString("granteeDisplayName", grant.Grantee.DisplayName);
+                        grantDict.SetString("granteeType", grant.Grantee.Type?.Value);
+                        grantDict.SetString("granteeEmailAddress", grant.Grantee.EmailAddress);
+                        grantDict.SetString("granteeUri", grant.Grantee.URI);
+                    }
+                    grantsArray.AddDictionary(grantDict);
+                }
+                mutableDoc.SetArray("grants", grantsArray);
+            }
+
+            _database.Save(mutableDoc);
+
+            return new PutACLResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<PutBucketAccelerateConfigurationResponse> PutBucketAccelerateConfigurationAsync(PutBucketAccelerateConfigurationRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
@@ -2420,14 +2760,91 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<PutBucketOwnershipControlsResponse> PutBucketOwnershipControlsAsync(PutBucketOwnershipControlsRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<PutBucketPolicyResponse> PutBucketPolicyAsync(string bucketName, string policy, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Sets the bucket policy for the specified bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="policy">The bucket policy as a JSON string.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the put operation.</returns>
+    public async Task<PutBucketPolicyResponse> PutBucketPolicyAsync(string bucketName, string policy, CancellationToken cancellationToken = default)
+    {
+        var request = new PutBucketPolicyRequest { BucketName = bucketName, Policy = policy };
+        return await PutBucketPolicyAsync(request, cancellationToken);
+    }
 
-    public Task<PutBucketPolicyResponse> PutBucketPolicyAsync(string bucketName, string policy, string contentMD5, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Sets the bucket policy for the specified bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="policy">The bucket policy as a JSON string.</param>
+    /// <param name="contentMD5">The MD5 hash of the policy content (not used in local storage).</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the put operation.</returns>
+    public async Task<PutBucketPolicyResponse> PutBucketPolicyAsync(string bucketName, string policy, string contentMD5, CancellationToken cancellationToken = default)
+    {
+        var request = new PutBucketPolicyRequest { BucketName = bucketName, Policy = policy, ContentMD5 = contentMD5 };
+        return await PutBucketPolicyAsync(request, cancellationToken);
+    }
 
-    public Task<PutBucketPolicyResponse> PutBucketPolicyAsync(PutBucketPolicyRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Sets the bucket policy for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name and policy.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the put operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist or the policy is invalid.</exception>
+    public async Task<PutBucketPolicyResponse> PutBucketPolicyAsync(PutBucketPolicyRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            if (string.IsNullOrEmpty(request.Policy))
+            {
+                throw new AmazonS3Exception("Policy is required")
+                {
+                    StatusCode = HttpStatusCode.BadRequest,
+                    ErrorCode = "MalformedPolicy"
+                };
+            }
+
+            var bucketDocId = $"bucket::{request.BucketName}";
+            var bucketDoc = _database.GetDocument(bucketDocId);
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            // Validate that the policy is valid JSON
+            try
+            {
+                System.Text.Json.JsonDocument.Parse(request.Policy);
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                throw new AmazonS3Exception("Invalid JSON policy document")
+                {
+                    StatusCode = HttpStatusCode.BadRequest,
+                    ErrorCode = "MalformedPolicy"
+                };
+            }
+
+            // Store the policy in the bucket document
+            using (var mutableDoc = bucketDoc.ToMutable())
+            {
+                mutableDoc.SetString("policy", request.Policy);
+                _database.Save(mutableDoc);
+            }
+
+            return new PutBucketPolicyResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<PutBucketReplicationResponse> PutBucketReplicationAsync(PutBucketReplicationRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
@@ -2529,8 +2946,48 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<PutObjectTaggingResponse> PutObjectTaggingAsync(PutObjectTaggingRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<PutPublicAccessBlockResponse> PutPublicAccessBlockAsync(PutPublicAccessBlockRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Sets the public access block configuration for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name and public access block configuration.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the put operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<PutPublicAccessBlockResponse> PutPublicAccessBlockAsync(PutPublicAccessBlockRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDocId = $"bucket::{request.BucketName}";
+            var bucketDoc = _database.GetDocument(bucketDocId);
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            using (var mutableDoc = bucketDoc.ToMutable())
+            {
+                var publicAccessBlock = new MutableDictionaryObject();
+                var config = request.PublicAccessBlockConfiguration;
+
+                publicAccessBlock.SetBoolean("blockPublicAcls", config.BlockPublicAcls);
+                publicAccessBlock.SetBoolean("ignorePublicAcls", config.IgnorePublicAcls);
+                publicAccessBlock.SetBoolean("blockPublicPolicy", config.BlockPublicPolicy);
+                publicAccessBlock.SetBoolean("restrictPublicBuckets", config.RestrictPublicBuckets);
+
+                mutableDoc.SetDictionary("publicAccessBlock", publicAccessBlock);
+                _database.Save(mutableDoc);
+            }
+
+            return new PutPublicAccessBlockResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<RestoreObjectResponse> RestoreObjectAsync(string bucketName, string key, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
