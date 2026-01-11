@@ -2700,4 +2700,111 @@ public class CouchbaseS3ClientTests
     }
 
     #endregion
+
+    #region Advanced Features Tests
+
+    [Test]
+    public async Task PutBucketTagging_SetsTagsSuccessfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+
+        // Act
+        var response = await _client.PutBucketTaggingAsync("test-bucket", new List<Tag>
+        {
+            new Tag { Key = "Environment", Value = "Production" },
+            new Tag { Key = "Team", Value = "Engineering" }
+        });
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GetBucketTagging_ReturnsTags()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutBucketTaggingAsync("test-bucket", new List<Tag>
+        {
+            new Tag { Key = "CostCenter", Value = "12345" }
+        });
+
+        // Act
+        var response = await _client.GetBucketTaggingAsync(new GetBucketTaggingRequest
+        {
+            BucketName = "test-bucket"
+        });
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.TagSet.Count, Is.EqualTo(1));
+        Assert.That(response.TagSet[0].Key, Is.EqualTo("CostCenter"));
+        Assert.That(response.TagSet[0].Value, Is.EqualTo("12345"));
+    }
+
+    [Test]
+    public async Task DeleteBucketTagging_RemovesTags()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutBucketTaggingAsync("test-bucket", new List<Tag>
+        {
+            new Tag { Key = "Test", Value = "Value" }
+        });
+
+        // Act
+        var response = await _client.DeleteBucketTaggingAsync("test-bucket");
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+
+        // Verify tags are deleted
+        var ex = Assert.ThrowsAsync<Amazon.S3.AmazonS3Exception>(
+            async () => await _client.GetBucketTaggingAsync(new GetBucketTaggingRequest
+            {
+                BucketName = "test-bucket"
+            }));
+        Assert.That(ex!.ErrorCode, Is.EqualTo("NoSuchTagSet"));
+    }
+
+    [Test]
+    public async Task RestoreObject_SucceedsForExistingObject()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes("test content"));
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            InputStream = stream
+        });
+
+        // Act
+        var response = await _client.RestoreObjectAsync("test-bucket", "test-key");
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public void RestoreObject_ThrowsForNonExistentObject()
+    {
+        // Arrange
+        _client.PutBucketAsync("test-bucket").Wait();
+
+        // Act & Assert
+        var ex = Assert.ThrowsAsync<Amazon.S3.AmazonS3Exception>(
+            async () => await _client.RestoreObjectAsync("test-bucket", "non-existent-key"));
+
+        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        Assert.That(ex.ErrorCode, Is.EqualTo("NoSuchKey"));
+    }
+
+    #endregion
 }

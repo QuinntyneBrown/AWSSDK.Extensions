@@ -1828,11 +1828,52 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<DeleteBucketReplicationResponse> DeleteBucketReplicationAsync(DeleteBucketReplicationRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<DeleteBucketTaggingResponse> DeleteBucketTaggingAsync(string bucketName, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Deletes all tags from the specified bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the delete operation.</returns>
+    public async Task<DeleteBucketTaggingResponse> DeleteBucketTaggingAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        var request = new DeleteBucketTaggingRequest { BucketName = bucketName };
+        return await DeleteBucketTaggingAsync(request, cancellationToken);
+    }
 
-    public Task<DeleteBucketTaggingResponse> DeleteBucketTaggingAsync(DeleteBucketTaggingRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Deletes all tags from the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the delete operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<DeleteBucketTaggingResponse> DeleteBucketTaggingAsync(DeleteBucketTaggingRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDocId = $"bucket::{request.BucketName}";
+            var bucketDoc = _database.GetDocument(bucketDocId);
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            using (var mutableDoc = bucketDoc.ToMutable())
+            {
+                mutableDoc.Remove("tags");
+                _database.Save(mutableDoc);
+            }
+
+            return new DeleteBucketTaggingResponse
+            {
+                HttpStatusCode = HttpStatusCode.NoContent
+            };
+        }, cancellationToken);
+    }
 
     /// <summary>
     /// Deletes the website configuration from the specified bucket.
@@ -2397,8 +2438,57 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<GetBucketRequestPaymentResponse> GetBucketRequestPaymentAsync(GetBucketRequestPaymentRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<GetBucketTaggingResponse> GetBucketTaggingAsync(GetBucketTaggingRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Gets the tags for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the bucket's tags.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist or has no tags.</exception>
+    public async Task<GetBucketTaggingResponse> GetBucketTaggingAsync(GetBucketTaggingRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDoc = _database.GetDocument($"bucket::{request.BucketName}");
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            var tagsArray = bucketDoc.GetArray("tags");
+            if (tagsArray == null || tagsArray.Count == 0)
+            {
+                throw new AmazonS3Exception("No tag set found")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchTagSet"
+                };
+            }
+
+            var tags = new List<Tag>();
+            foreach (var tagItem in tagsArray)
+            {
+                if (tagItem is DictionaryObject tagDict)
+                {
+                    tags.Add(new Tag
+                    {
+                        Key = tagDict.GetString("key") ?? string.Empty,
+                        Value = tagDict.GetString("value") ?? string.Empty
+                    });
+                }
+            }
+
+            return new GetBucketTaggingResponse
+            {
+                TagSet = tags,
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     /// <summary>
     /// Gets the versioning state of a bucket.
@@ -3805,11 +3895,64 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<PutBucketRequestPaymentResponse> PutBucketRequestPaymentAsync(PutBucketRequestPaymentRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<PutBucketTaggingResponse> PutBucketTaggingAsync(string bucketName, List<Tag> tagSet, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Sets the tags for the specified bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="tagSet">The list of tags to set.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the put operation.</returns>
+    public async Task<PutBucketTaggingResponse> PutBucketTaggingAsync(string bucketName, List<Tag> tagSet, CancellationToken cancellationToken = default)
+    {
+        var request = new PutBucketTaggingRequest { BucketName = bucketName, TagSet = tagSet };
+        return await PutBucketTaggingAsync(request, cancellationToken);
+    }
 
-    public Task<PutBucketTaggingResponse> PutBucketTaggingAsync(PutBucketTaggingRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Sets the tags for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name and tags.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the put operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<PutBucketTaggingResponse> PutBucketTaggingAsync(PutBucketTaggingRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDocId = $"bucket::{request.BucketName}";
+            var bucketDoc = _database.GetDocument(bucketDocId);
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            using (var mutableDoc = bucketDoc.ToMutable())
+            {
+                var tagsArray = new MutableArrayObject();
+                if (request.TagSet != null)
+                {
+                    foreach (var tag in request.TagSet)
+                    {
+                        var tagDict = new MutableDictionaryObject();
+                        tagDict.SetString("key", tag.Key);
+                        tagDict.SetString("value", tag.Value);
+                        tagsArray.AddDictionary(tagDict);
+                    }
+                }
+                mutableDoc.SetArray("tags", tagsArray);
+                _database.Save(mutableDoc);
+            }
+
+            return new PutBucketTaggingResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     /// <summary>
     /// Sets the versioning state of a bucket.
@@ -4405,17 +4548,77 @@ public class CouchbaseS3Client : IAmazonS3
         }, cancellationToken);
     }
 
-    public Task<RestoreObjectResponse> RestoreObjectAsync(string bucketName, string key, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Initiates a restore request for an archived object.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="key">The object key.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the restore has been initiated.</returns>
+    /// <remarks>In local storage, objects are always immediately accessible, so this operation is a no-op.</remarks>
+    public async Task<RestoreObjectResponse> RestoreObjectAsync(string bucketName, string key, CancellationToken cancellationToken = default)
+    {
+        var request = new RestoreObjectRequest { BucketName = bucketName, Key = key };
+        return await RestoreObjectAsync(request, cancellationToken);
+    }
 
-    public Task<RestoreObjectResponse> RestoreObjectAsync(string bucketName, string key, int days, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Initiates a restore request for an archived object.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="key">The object key.</param>
+    /// <param name="days">The number of days to keep the restored copy available.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the restore has been initiated.</returns>
+    /// <remarks>In local storage, objects are always immediately accessible, so this operation is a no-op.</remarks>
+    public async Task<RestoreObjectResponse> RestoreObjectAsync(string bucketName, string key, int days, CancellationToken cancellationToken = default)
+    {
+        var request = new RestoreObjectRequest { BucketName = bucketName, Key = key, Days = days };
+        return await RestoreObjectAsync(request, cancellationToken);
+    }
 
-    public Task<RestoreObjectResponse> RestoreObjectAsync(RestoreObjectRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Initiates a restore request for an archived object.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name, key, and restore parameters.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the restore has been initiated.</returns>
+    /// <remarks>In local storage, objects are always immediately accessible, so this operation is a no-op.</remarks>
+    /// <exception cref="AmazonS3Exception">Thrown when the object does not exist.</exception>
+    public async Task<RestoreObjectResponse> RestoreObjectAsync(RestoreObjectRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var objectDocId = $"object::{request.BucketName}::{request.Key}";
+            var objectDoc = _database.GetDocument(objectDocId);
+            if (objectDoc == null)
+            {
+                throw new AmazonS3Exception("Object does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchKey"
+                };
+            }
 
+            // In local storage, objects are always immediately accessible
+            // Return success to indicate the object is ready
+            return new RestoreObjectResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK,
+                RestoreOutputPath = $"s3://{request.BucketName}/{request.Key}"
+            };
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Selects content from an object using SQL-like expressions.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name, key, and query expression.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the selected content.</returns>
+    /// <remarks>S3 Select is not fully supported in local storage. This operation throws NotImplementedException.</remarks>
     public Task<SelectObjectContentResponse> SelectObjectContentAsync(SelectObjectContentRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+        => throw new NotImplementedException("S3 Select is not supported in local Couchbase Lite storage.");
 
     /// <summary>
     /// Uploads a part of a multipart upload.
