@@ -860,11 +860,19 @@ public class CouchbaseS3Client : IAmazonS3
         throw new NotImplementedException();
     }
 
-    // Newer async interface members introduced in recent AWSSDK versions
+    #region Pre-signed URL Operations
 
+    // Signing key for pre-signed URLs (in production, this would be configured)
+    private static readonly string _signingKey = "CouchbaseLiteS3SigningKey";
+
+    /// <summary>
+    /// Generates a pre-signed URL asynchronously for accessing an object without authentication.
+    /// </summary>
+    /// <param name="request">The request containing bucket name, key, verb, and expiration details.</param>
+    /// <returns>A signed URL that provides temporary access to the specified object.</returns>
     public Task<string> GetPreSignedURLAsync(GetPreSignedUrlRequest request)
     {
-        throw new NotImplementedException();
+        return Task.FromResult(GetPreSignedURL(request));
     }
 
     /// <summary>
@@ -1342,8 +1350,122 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<GetObjectTorrentResponse> GetObjectTorrentAsync(GetObjectTorrentRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
+    /// <summary>
+    /// Generates a pre-signed URL for accessing an object without authentication.
+    /// The URL includes a signature and expiration time that can be validated.
+    /// </summary>
+    /// <param name="request">The request containing bucket name, key, verb, and expiration details.</param>
+    /// <returns>A signed URL that provides temporary access to the specified object.</returns>
+    /// <remarks>
+    /// For Couchbase Lite local storage, this generates a custom URL format:
+    /// cblite://{bucket}/{key}?expires={timestamp}&amp;verb={verb}&amp;signature={sig}
+    /// The signature is an HMAC-SHA256 hash of the URL components.
+    /// </remarks>
     public string GetPreSignedURL(GetPreSignedUrlRequest request)
-        => throw new NotImplementedException();
+    {
+        if (string.IsNullOrEmpty(request.BucketName))
+        {
+            throw new ArgumentException("Bucket name is required", nameof(request));
+        }
+
+        if (string.IsNullOrEmpty(request.Key))
+        {
+            throw new ArgumentException("Key is required", nameof(request));
+        }
+
+        // Calculate expiration timestamp
+        var expiresUtc = request.Expires.ToUniversalTime();
+        var expiresTimestamp = new DateTimeOffset(expiresUtc).ToUnixTimeSeconds();
+
+        // Determine the HTTP verb
+        var verb = request.Verb.ToString().ToUpperInvariant();
+
+        // Create the string to sign
+        var stringToSign = $"{verb}\n{request.BucketName}\n{request.Key}\n{expiresTimestamp}";
+
+        // Generate HMAC-SHA256 signature
+        string signature;
+        using (var hmac = new System.Security.Cryptography.HMACSHA256(
+            System.Text.Encoding.UTF8.GetBytes(_signingKey)))
+        {
+            var signatureBytes = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(stringToSign));
+            signature = Convert.ToBase64String(signatureBytes)
+                .Replace("+", "-")
+                .Replace("/", "_")
+                .TrimEnd('=');
+        }
+
+        // Build the pre-signed URL
+        // Using a custom scheme for local storage
+        var encodedKey = Uri.EscapeDataString(request.Key);
+        var url = $"cblite://{request.BucketName}/{encodedKey}?X-Expires={expiresTimestamp}&X-Verb={verb}&X-Signature={signature}";
+
+        // Add version ID if specified
+        if (!string.IsNullOrEmpty(request.VersionId))
+        {
+            url += $"&versionId={Uri.EscapeDataString(request.VersionId)}";
+        }
+
+        return url;
+    }
+
+    /// <summary>
+    /// Validates a pre-signed URL signature and expiration.
+    /// </summary>
+    /// <param name="url">The pre-signed URL to validate.</param>
+    /// <returns>True if the URL is valid and not expired, false otherwise.</returns>
+    public bool ValidatePreSignedURL(string url)
+    {
+        try
+        {
+            var uri = new Uri(url);
+            var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+
+            var expiresStr = query["X-Expires"];
+            var verb = query["X-Verb"];
+            var providedSignature = query["X-Signature"];
+
+            if (string.IsNullOrEmpty(expiresStr) || string.IsNullOrEmpty(verb) || string.IsNullOrEmpty(providedSignature))
+            {
+                return false;
+            }
+
+            // Check expiration
+            var expiresTimestamp = long.Parse(expiresStr);
+            var expiresDateTime = DateTimeOffset.FromUnixTimeSeconds(expiresTimestamp);
+            if (expiresDateTime < DateTimeOffset.UtcNow)
+            {
+                return false;
+            }
+
+            // Extract bucket and key from path
+            var bucketName = uri.Host;
+            var key = Uri.UnescapeDataString(uri.AbsolutePath.TrimStart('/'));
+
+            // Recreate the string to sign
+            var stringToSign = $"{verb}\n{bucketName}\n{key}\n{expiresTimestamp}";
+
+            // Generate expected signature
+            string expectedSignature;
+            using (var hmac = new System.Security.Cryptography.HMACSHA256(
+                System.Text.Encoding.UTF8.GetBytes(_signingKey)))
+            {
+                var signatureBytes = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(stringToSign));
+                expectedSignature = Convert.ToBase64String(signatureBytes)
+                    .Replace("+", "-")
+                    .Replace("/", "_")
+                    .TrimEnd('=');
+            }
+
+            return expectedSignature == providedSignature;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    #endregion
 
     public Task<GetPublicAccessBlockResponse> GetPublicAccessBlockAsync(GetPublicAccessBlockRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
@@ -1496,8 +1618,40 @@ public class CouchbaseS3Client : IAmazonS3
 
     #region ICoreAmazonS3 members required by newer AWSSDK
 
+    /// <summary>
+    /// Generates a pre-signed URL for accessing an object.
+    /// This is an alternate interface from ICoreAmazonS3.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="objectKey">The key of the object.</param>
+    /// <param name="expiration">The expiration date/time for the URL.</param>
+    /// <param name="additionalProperties">Additional properties (verb can be specified here).</param>
+    /// <returns>A signed URL that provides temporary access to the specified object.</returns>
     public string GeneratePreSignedURL(string bucketName, string objectKey, DateTime expiration, IDictionary<string, object> additionalProperties)
-        => throw new NotImplementedException();
+    {
+        var verb = HttpVerb.GET;
+        if (additionalProperties != null && additionalProperties.TryGetValue("Verb", out var verbObj))
+        {
+            if (verbObj is HttpVerb httpVerb)
+            {
+                verb = httpVerb;
+            }
+            else if (verbObj is string verbStr && Enum.TryParse<HttpVerb>(verbStr, true, out var parsedVerb))
+            {
+                verb = parsedVerb;
+            }
+        }
+
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = bucketName,
+            Key = objectKey,
+            Expires = expiration,
+            Verb = verb
+        };
+
+        return GetPreSignedURL(request);
+    }
 
     public Task<IList<string>> GetAllObjectKeysAsync(string bucketName, string prefix, IDictionary<string, object> additionalProperties)
         => throw new NotImplementedException();

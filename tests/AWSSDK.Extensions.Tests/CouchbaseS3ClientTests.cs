@@ -794,4 +794,252 @@ public class CouchbaseS3ClientTests
     }
 
     #endregion
+
+    #region Pre-signed URL Tests
+
+    [Test]
+    public void GetPreSignedURL_GeneratesValidURL_ForGET()
+    {
+        // Arrange
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            Expires = DateTime.UtcNow.AddHours(1),
+            Verb = HttpVerb.GET
+        };
+
+        // Act
+        var url = _client.GetPreSignedURL(request);
+
+        // Assert
+        Assert.That(url, Is.Not.Null.And.Not.Empty);
+        Assert.That(url, Does.StartWith("cblite://test-bucket/test-key"));
+        Assert.That(url, Does.Contain("X-Expires="));
+        Assert.That(url, Does.Contain("X-Verb=GET"));
+        Assert.That(url, Does.Contain("X-Signature="));
+    }
+
+    [Test]
+    public void GetPreSignedURL_GeneratesValidURL_ForPUT()
+    {
+        // Arrange
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = "test-bucket",
+            Key = "upload-key",
+            Expires = DateTime.UtcNow.AddMinutes(30),
+            Verb = HttpVerb.PUT
+        };
+
+        // Act
+        var url = _client.GetPreSignedURL(request);
+
+        // Assert
+        Assert.That(url, Does.Contain("X-Verb=PUT"));
+    }
+
+    [Test]
+    public void GetPreSignedURL_GeneratesValidURL_ForDELETE()
+    {
+        // Arrange
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = "test-bucket",
+            Key = "delete-key",
+            Expires = DateTime.UtcNow.AddMinutes(15),
+            Verb = HttpVerb.DELETE
+        };
+
+        // Act
+        var url = _client.GetPreSignedURL(request);
+
+        // Assert
+        Assert.That(url, Does.Contain("X-Verb=DELETE"));
+    }
+
+    [Test]
+    public async Task GetPreSignedURLAsync_GeneratesValidURL()
+    {
+        // Arrange
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = "test-bucket",
+            Key = "async-key",
+            Expires = DateTime.UtcNow.AddHours(2),
+            Verb = HttpVerb.GET
+        };
+
+        // Act
+        var url = await _client.GetPreSignedURLAsync(request);
+
+        // Assert
+        Assert.That(url, Is.Not.Null.And.Not.Empty);
+        Assert.That(url, Does.StartWith("cblite://"));
+    }
+
+    [Test]
+    public void GetPreSignedURL_IncludesVersionId_WhenSpecified()
+    {
+        // Arrange
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = "test-bucket",
+            Key = "versioned-key",
+            Expires = DateTime.UtcNow.AddHours(1),
+            Verb = HttpVerb.GET,
+            VersionId = "v123456"
+        };
+
+        // Act
+        var url = _client.GetPreSignedURL(request);
+
+        // Assert
+        Assert.That(url, Does.Contain("versionId=v123456"));
+    }
+
+    [Test]
+    public void GetPreSignedURL_EncodesSpecialCharacters_InKey()
+    {
+        // Arrange
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = "test-bucket",
+            Key = "folder/file with spaces.txt",
+            Expires = DateTime.UtcNow.AddHours(1),
+            Verb = HttpVerb.GET
+        };
+
+        // Act
+        var url = _client.GetPreSignedURL(request);
+
+        // Assert
+        Assert.That(url, Does.Contain("folder%2Ffile%20with%20spaces.txt"));
+    }
+
+    [Test]
+    public void GetPreSignedURL_ThrowsException_WhenBucketNameMissing()
+    {
+        // Arrange
+        var request = new GetPreSignedUrlRequest
+        {
+            Key = "test-key",
+            Expires = DateTime.UtcNow.AddHours(1),
+            Verb = HttpVerb.GET
+        };
+
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => _client.GetPreSignedURL(request));
+    }
+
+    [Test]
+    public void GetPreSignedURL_ThrowsException_WhenKeyMissing()
+    {
+        // Arrange
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = "test-bucket",
+            Expires = DateTime.UtcNow.AddHours(1),
+            Verb = HttpVerb.GET
+        };
+
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => _client.GetPreSignedURL(request));
+    }
+
+    [Test]
+    public void ValidatePreSignedURL_ReturnsTrue_ForValidURL()
+    {
+        // Arrange
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            Expires = DateTime.UtcNow.AddHours(1),
+            Verb = HttpVerb.GET
+        };
+        var url = _client.GetPreSignedURL(request);
+
+        // Act
+        var isValid = _client.ValidatePreSignedURL(url);
+
+        // Assert
+        Assert.That(isValid, Is.True);
+    }
+
+    [Test]
+    public void ValidatePreSignedURL_ReturnsFalse_ForExpiredURL()
+    {
+        // Arrange - create a URL that expired in the past
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            Expires = DateTime.UtcNow.AddSeconds(-1), // Already expired
+            Verb = HttpVerb.GET
+        };
+        var url = _client.GetPreSignedURL(request);
+
+        // Act
+        var isValid = _client.ValidatePreSignedURL(url);
+
+        // Assert
+        Assert.That(isValid, Is.False);
+    }
+
+    [Test]
+    public void ValidatePreSignedURL_ReturnsFalse_ForTamperedSignature()
+    {
+        // Arrange
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            Expires = DateTime.UtcNow.AddHours(1),
+            Verb = HttpVerb.GET
+        };
+        var url = _client.GetPreSignedURL(request);
+
+        // Tamper with the signature
+        var tamperedUrl = url.Replace("X-Signature=", "X-Signature=TAMPERED");
+
+        // Act
+        var isValid = _client.ValidatePreSignedURL(tamperedUrl);
+
+        // Assert
+        Assert.That(isValid, Is.False);
+    }
+
+    [Test]
+    public void ValidatePreSignedURL_ReturnsFalse_ForInvalidURL()
+    {
+        // Act
+        var isValid = _client.ValidatePreSignedURL("not-a-valid-url");
+
+        // Assert
+        Assert.That(isValid, Is.False);
+    }
+
+    [Test]
+    public void GeneratePreSignedURL_GeneratesValidURL()
+    {
+        // Arrange
+        var additionalProperties = new Dictionary<string, object>
+        {
+            { "Verb", HttpVerb.GET }
+        };
+
+        // Act
+        var url = _client.GeneratePreSignedURL(
+            "test-bucket",
+            "test-key",
+            DateTime.UtcNow.AddHours(1),
+            additionalProperties);
+
+        // Assert
+        Assert.That(url, Is.Not.Null.And.Not.Empty);
+        Assert.That(url, Does.StartWith("cblite://"));
+    }
+
+    #endregion
 }
