@@ -1352,14 +1352,232 @@ public class CouchbaseS3Client : IAmazonS3
     // This implementation covers the core operations.
     // Additional methods would need similar implementations.
 
-    public Task<AbortMultipartUploadResponse> AbortMultipartUploadAsync(string bucketName, string key, string uploadId, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Aborts a multipart upload and deletes all uploaded parts.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="key">The object key.</param>
+    /// <param name="uploadId">The upload ID.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating success.</returns>
+    public async Task<AbortMultipartUploadResponse> AbortMultipartUploadAsync(string bucketName, string key, string uploadId, CancellationToken cancellationToken = default)
+    {
+        var request = new AbortMultipartUploadRequest
+        {
+            BucketName = bucketName,
+            Key = key,
+            UploadId = uploadId
+        };
+        return await AbortMultipartUploadAsync(request, cancellationToken);
+    }
 
-    public Task<AbortMultipartUploadResponse> AbortMultipartUploadAsync(AbortMultipartUploadRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Aborts a multipart upload and deletes all uploaded parts.
+    /// </summary>
+    /// <param name="request">The request containing the upload ID.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating success.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the upload does not exist.</exception>
+    public async Task<AbortMultipartUploadResponse> AbortMultipartUploadAsync(AbortMultipartUploadRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            // Verify the upload exists
+            var uploadDocId = $"upload::{request.UploadId}";
+            var uploadDoc = _database.GetDocument(uploadDocId);
+            if (uploadDoc == null)
+            {
+                throw new AmazonS3Exception("The specified upload does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchUpload"
+                };
+            }
 
-    public Task<CompleteMultipartUploadResponse> CompleteMultipartUploadAsync(CompleteMultipartUploadRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            // Delete all parts for this upload
+            var partsQuery = QueryBuilder.Select(SelectResult.Expression(Meta.ID))
+                .From(DataSource.Database(_database))
+                .Where(
+                    Expression.Property("type").EqualTo(Expression.String("part"))
+                    .And(Expression.Property("uploadId").EqualTo(Expression.String(request.UploadId)))
+                );
+
+            foreach (var result in partsQuery.Execute())
+            {
+                var partDocId = result.GetString("id");
+                if (partDocId != null)
+                {
+                    var partDoc = _database.GetDocument(partDocId);
+                    if (partDoc != null)
+                    {
+                        _database.Delete(partDoc);
+                    }
+                }
+            }
+
+            // Delete the upload document
+            _database.Delete(uploadDoc);
+
+            return new AbortMultipartUploadResponse
+            {
+                HttpStatusCode = HttpStatusCode.NoContent
+            };
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Completes a multipart upload by assembling all parts into a final object.
+    /// </summary>
+    /// <param name="request">The request containing the upload ID and list of parts.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the ETag and location of the completed object.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the upload does not exist or parts are invalid.</exception>
+    public async Task<CompleteMultipartUploadResponse> CompleteMultipartUploadAsync(CompleteMultipartUploadRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            // Verify the upload exists
+            var uploadDocId = $"upload::{request.UploadId}";
+            var uploadDoc = _database.GetDocument(uploadDocId);
+            if (uploadDoc == null)
+            {
+                throw new AmazonS3Exception("The specified upload does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchUpload"
+                };
+            }
+
+            var bucketName = uploadDoc.GetString("bucketName");
+            var key = uploadDoc.GetString("key");
+            var contentType = uploadDoc.GetString("contentType");
+
+            // Collect all parts in order and concatenate
+            var allContent = new List<byte>();
+            var partEtags = new List<string>();
+
+            // Sort parts by part number
+            var sortedParts = request.PartETags?.OrderBy(p => p.PartNumber).ToList() ?? new List<PartETag>();
+
+            foreach (var partEtag in sortedParts)
+            {
+                var partDocId = $"part::{request.UploadId}::{partEtag.PartNumber}";
+                var partDoc = _database.GetDocument(partDocId);
+
+                if (partDoc == null)
+                {
+                    throw new AmazonS3Exception($"Part {partEtag.PartNumber} not found")
+                    {
+                        StatusCode = HttpStatusCode.BadRequest,
+                        ErrorCode = "InvalidPart"
+                    };
+                }
+
+                var storedEtag = partDoc.GetString("etag");
+                var providedEtag = partEtag.ETag?.Trim('"');
+
+                if (storedEtag != providedEtag)
+                {
+                    throw new AmazonS3Exception($"Part {partEtag.PartNumber} ETag mismatch")
+                    {
+                        StatusCode = HttpStatusCode.BadRequest,
+                        ErrorCode = "InvalidPart"
+                    };
+                }
+
+                var partBlob = partDoc.GetBlob("content");
+                if (partBlob != null)
+                {
+                    using (var ms = new MemoryStream())
+                    {
+                        partBlob.ContentStream?.CopyTo(ms);
+                        allContent.AddRange(ms.ToArray());
+                    }
+                }
+                partEtags.Add(storedEtag);
+            }
+
+            var finalContent = allContent.ToArray();
+
+            // Calculate final ETag (S3 uses special format for multipart: "etag-N" where N is part count)
+            string finalEtag;
+            using (var md5 = System.Security.Cryptography.MD5.Create())
+            {
+                // Concatenate all part MD5s and compute MD5 of that
+                var combinedHashes = new List<byte>();
+                foreach (var etag in partEtags)
+                {
+                    var hashBytes = new byte[etag.Length / 2];
+                    for (int i = 0; i < hashBytes.Length; i++)
+                    {
+                        hashBytes[i] = Convert.ToByte(etag.Substring(i * 2, 2), 16);
+                    }
+                    combinedHashes.AddRange(hashBytes);
+                }
+                var finalHash = md5.ComputeHash(combinedHashes.ToArray());
+                finalEtag = BitConverter.ToString(finalHash).Replace("-", "").ToLowerInvariant() + $"-{sortedParts.Count}";
+            }
+
+            // Create the final object document
+            var objectDocId = $"object::{bucketName}::{key}";
+            var objectDoc = new MutableDocument(objectDocId);
+            objectDoc.SetString("type", "object");
+            objectDoc.SetString("bucketName", bucketName);
+            objectDoc.SetString("key", key);
+            objectDoc.SetString("contentType", contentType);
+            objectDoc.SetDate("lastModified", DateTimeOffset.UtcNow);
+            objectDoc.SetLong("size", finalContent.Length);
+            objectDoc.SetString("etag", finalEtag);
+
+            // Extract prefix for efficient prefix searches
+            var lastSlash = key.LastIndexOf('/');
+            if (lastSlash > 0)
+            {
+                objectDoc.SetString("prefix", key.Substring(0, lastSlash + 1));
+            }
+
+            // Store content as blob
+            var contentBlob = new Blob(contentType, finalContent);
+            objectDoc.SetBlob("content", contentBlob);
+
+            // Copy metadata from upload doc
+            var metadata = uploadDoc.GetDictionary("metadata");
+            if (metadata != null)
+            {
+                var metadataDict = new MutableDictionaryObject();
+                foreach (var mk in metadata.Keys)
+                {
+                    metadataDict.SetString(mk, metadata.GetString(mk));
+                }
+                objectDoc.SetDictionary("metadata", metadataDict);
+            }
+
+            _database.Save(objectDoc);
+
+            // Delete all parts
+            foreach (var partEtag in sortedParts)
+            {
+                var partDocId = $"part::{request.UploadId}::{partEtag.PartNumber}";
+                var partDoc = _database.GetDocument(partDocId);
+                if (partDoc != null)
+                {
+                    _database.Delete(partDoc);
+                }
+            }
+
+            // Delete the upload document
+            _database.Delete(uploadDoc);
+
+            return new CompleteMultipartUploadResponse
+            {
+                BucketName = bucketName,
+                Key = key,
+                ETag = finalEtag,
+                Location = $"cblite://{bucketName}/{key}",
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     /// <summary>
     /// Copies a part of an object as part of a multipart upload operation.
@@ -1853,11 +2071,81 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<GetPublicAccessBlockResponse> GetPublicAccessBlockAsync(GetPublicAccessBlockRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<InitiateMultipartUploadResponse> InitiateMultipartUploadAsync(string bucketName, string key, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Initiates a multipart upload for a large object.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="key">The object key.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the upload ID.</returns>
+    public async Task<InitiateMultipartUploadResponse> InitiateMultipartUploadAsync(string bucketName, string key, CancellationToken cancellationToken = default)
+    {
+        var request = new InitiateMultipartUploadRequest
+        {
+            BucketName = bucketName,
+            Key = key
+        };
+        return await InitiateMultipartUploadAsync(request, cancellationToken);
+    }
 
-    public Task<InitiateMultipartUploadResponse> InitiateMultipartUploadAsync(InitiateMultipartUploadRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Initiates a multipart upload for a large object.
+    /// Returns an upload ID that is used to track parts of the upload.
+    /// </summary>
+    /// <param name="request">The request containing bucket name, key, and optional metadata.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the upload ID.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<InitiateMultipartUploadResponse> InitiateMultipartUploadAsync(InitiateMultipartUploadRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            // Verify bucket exists
+            var bucketDoc = _database.GetDocument($"bucket::{request.BucketName}");
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            // Generate upload ID
+            var uploadId = Guid.NewGuid().ToString("N");
+
+            // Create upload tracking document
+            var uploadDocId = $"upload::{uploadId}";
+            var uploadDoc = new MutableDocument(uploadDocId);
+            uploadDoc.SetString("type", "upload");
+            uploadDoc.SetString("uploadId", uploadId);
+            uploadDoc.SetString("bucketName", request.BucketName);
+            uploadDoc.SetString("key", request.Key);
+            uploadDoc.SetDate("initiated", DateTimeOffset.UtcNow);
+            uploadDoc.SetString("contentType", request.ContentType ?? "application/octet-stream");
+
+            // Store metadata if provided
+            if (request.Metadata?.Count > 0)
+            {
+                var metadataDict = new MutableDictionaryObject();
+                foreach (var key in request.Metadata.Keys)
+                {
+                    metadataDict.SetString(key, request.Metadata[key]);
+                }
+                uploadDoc.SetDictionary("metadata", metadataDict);
+            }
+
+            _database.Save(uploadDoc);
+
+            return new InitiateMultipartUploadResponse
+            {
+                BucketName = request.BucketName,
+                Key = request.Key,
+                UploadId = uploadId,
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<ListBucketAnalyticsConfigurationsResponse> ListBucketAnalyticsConfigurationsAsync(ListBucketAnalyticsConfigurationsRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
@@ -1871,20 +2159,233 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<ListBucketMetricsConfigurationsResponse> ListBucketMetricsConfigurationsAsync(ListBucketMetricsConfigurationsRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<ListMultipartUploadsResponse> ListMultipartUploadsAsync(string bucketName, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Lists in-progress multipart uploads in a bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the list of in-progress uploads.</returns>
+    public async Task<ListMultipartUploadsResponse> ListMultipartUploadsAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        var request = new ListMultipartUploadsRequest { BucketName = bucketName };
+        return await ListMultipartUploadsAsync(request, cancellationToken);
+    }
 
-    public Task<ListMultipartUploadsResponse> ListMultipartUploadsAsync(string bucketName, string prefix, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Lists in-progress multipart uploads in a bucket with a prefix filter.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="prefix">The prefix to filter uploads by.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the filtered list of in-progress uploads.</returns>
+    public async Task<ListMultipartUploadsResponse> ListMultipartUploadsAsync(string bucketName, string prefix, CancellationToken cancellationToken = default)
+    {
+        var request = new ListMultipartUploadsRequest
+        {
+            BucketName = bucketName,
+            Prefix = prefix
+        };
+        return await ListMultipartUploadsAsync(request, cancellationToken);
+    }
 
-    public Task<ListMultipartUploadsResponse> ListMultipartUploadsAsync(ListMultipartUploadsRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Lists in-progress multipart uploads in a bucket.
+    /// </summary>
+    /// <param name="request">The request containing bucket name and filter parameters.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the list of in-progress uploads.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<ListMultipartUploadsResponse> ListMultipartUploadsAsync(ListMultipartUploadsRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            // Verify bucket exists
+            var bucketDoc = _database.GetDocument($"bucket::{request.BucketName}");
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
 
-    public Task<ListPartsResponse> ListPartsAsync(string bucketName, string key, string uploadId, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            var uploads = new List<MultipartUpload>();
 
-    public Task<ListPartsResponse> ListPartsAsync(ListPartsRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            var query = QueryBuilder.Select(SelectResult.All())
+                .From(DataSource.Database(_database))
+                .Where(
+                    Expression.Property("type").EqualTo(Expression.String("upload"))
+                    .And(Expression.Property("bucketName").EqualTo(Expression.String(request.BucketName)))
+                );
+
+            foreach (var result in query.Execute())
+            {
+                var dict = result.GetDictionary(0);
+                var key = dict.GetString("key");
+
+                // Apply prefix filter
+                if (!string.IsNullOrEmpty(request.Prefix) && !key.StartsWith(request.Prefix))
+                {
+                    continue;
+                }
+
+                // Apply key marker filter
+                if (!string.IsNullOrEmpty(request.KeyMarker) &&
+                    string.CompareOrdinal(key, request.KeyMarker) <= 0)
+                {
+                    continue;
+                }
+
+                uploads.Add(new MultipartUpload
+                {
+                    Key = key,
+                    UploadId = dict.GetString("uploadId"),
+                    Initiated = dict.GetDate("initiated").UtcDateTime,
+                    StorageClass = S3StorageClass.Standard
+                });
+            }
+
+            // Sort by key then by initiated
+            uploads = uploads
+                .OrderBy(u => u.Key)
+                .ThenBy(u => u.Initiated)
+                .ToList();
+
+            // Apply max uploads
+            var maxUploads = request.MaxUploads > 0 ? request.MaxUploads : 1000;
+            var isTruncated = uploads.Count > maxUploads;
+
+            if (isTruncated)
+            {
+                uploads = uploads.Take(maxUploads).ToList();
+            }
+
+            var response = new ListMultipartUploadsResponse
+            {
+                BucketName = request.BucketName,
+                Prefix = request.Prefix,
+                KeyMarker = request.KeyMarker,
+                UploadIdMarker = request.UploadIdMarker,
+                MaxUploads = maxUploads,
+                IsTruncated = isTruncated,
+                MultipartUploads = uploads,
+                HttpStatusCode = HttpStatusCode.OK
+            };
+
+            if (isTruncated && uploads.Any())
+            {
+                var lastUpload = uploads.Last();
+                response.NextKeyMarker = lastUpload.Key;
+                response.NextUploadIdMarker = lastUpload.UploadId;
+            }
+
+            return response;
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Lists the parts that have been uploaded for a multipart upload.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="key">The object key.</param>
+    /// <param name="uploadId">The upload ID.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the list of uploaded parts.</returns>
+    public async Task<ListPartsResponse> ListPartsAsync(string bucketName, string key, string uploadId, CancellationToken cancellationToken = default)
+    {
+        var request = new ListPartsRequest
+        {
+            BucketName = bucketName,
+            Key = key,
+            UploadId = uploadId
+        };
+        return await ListPartsAsync(request, cancellationToken);
+    }
+
+    /// <summary>
+    /// Lists the parts that have been uploaded for a multipart upload.
+    /// </summary>
+    /// <param name="request">The request containing the upload ID.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the list of uploaded parts.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the upload does not exist.</exception>
+    public async Task<ListPartsResponse> ListPartsAsync(ListPartsRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            // Verify the upload exists
+            var uploadDoc = _database.GetDocument($"upload::{request.UploadId}");
+            if (uploadDoc == null)
+            {
+                throw new AmazonS3Exception("The specified upload does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchUpload"
+                };
+            }
+
+            var parts = new List<PartDetail>();
+
+            var query = QueryBuilder.Select(SelectResult.All())
+                .From(DataSource.Database(_database))
+                .Where(
+                    Expression.Property("type").EqualTo(Expression.String("part"))
+                    .And(Expression.Property("uploadId").EqualTo(Expression.String(request.UploadId)))
+                );
+
+            foreach (var result in query.Execute())
+            {
+                var dict = result.GetDictionary(0);
+                var partNumber = dict.GetInt("partNumber");
+
+                // Apply part number marker filter
+                if (request.PartNumberMarker.HasValue && partNumber <= request.PartNumberMarker.Value)
+                {
+                    continue;
+                }
+
+                parts.Add(new PartDetail
+                {
+                    PartNumber = partNumber,
+                    Size = dict.GetLong("size"),
+                    ETag = dict.GetString("etag"),
+                    LastModified = dict.GetDate("lastModified").UtcDateTime
+                });
+            }
+
+            // Sort by part number
+            parts = parts.OrderBy(p => p.PartNumber).ToList();
+
+            // Apply max parts
+            var maxParts = request.MaxParts > 0 ? request.MaxParts : 1000;
+            var isTruncated = parts.Count > maxParts;
+
+            if (isTruncated)
+            {
+                parts = parts.Take(maxParts).ToList();
+            }
+
+            var response = new ListPartsResponse
+            {
+                BucketName = request.BucketName,
+                Key = request.Key,
+                UploadId = request.UploadId,
+                PartNumberMarker = request.PartNumberMarker ?? 0,
+                MaxParts = maxParts,
+                IsTruncated = isTruncated,
+                Parts = parts,
+                HttpStatusCode = HttpStatusCode.OK
+            };
+
+            if (isTruncated && parts.Any())
+            {
+                response.NextPartNumberMarker = parts.Last().PartNumber;
+            }
+
+            return response;
+        }, cancellationToken);
+    }
 
     public void MakeObjectPublic(string bucketName, string objectKey, bool enable)
         => throw new NotImplementedException();
@@ -2043,8 +2544,85 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<SelectObjectContentResponse> SelectObjectContentAsync(SelectObjectContentRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<UploadPartResponse> UploadPartAsync(UploadPartRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Uploads a part of a multipart upload.
+    /// </summary>
+    /// <param name="request">The request containing the upload ID, part number, and data.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the ETag of the uploaded part.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the upload does not exist or part number is invalid.</exception>
+    public async Task<UploadPartResponse> UploadPartAsync(UploadPartRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            // Validate part number (S3 allows 1-10000)
+            if (request.PartNumber < 1 || request.PartNumber > 10000)
+            {
+                throw new AmazonS3Exception("Part number must be between 1 and 10000")
+                {
+                    StatusCode = HttpStatusCode.BadRequest,
+                    ErrorCode = "InvalidArgument"
+                };
+            }
+
+            // Verify the upload exists
+            var uploadDoc = _database.GetDocument($"upload::{request.UploadId}");
+            if (uploadDoc == null)
+            {
+                throw new AmazonS3Exception("The specified upload does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchUpload"
+                };
+            }
+
+            // Read content
+            byte[] content;
+            if (request.InputStream != null)
+            {
+                using (var ms = new MemoryStream())
+                {
+                    request.InputStream.CopyTo(ms);
+                    content = ms.ToArray();
+                }
+            }
+            else
+            {
+                content = Array.Empty<byte>();
+            }
+
+            // Store the part
+            var partDocId = $"part::{request.UploadId}::{request.PartNumber}";
+            var partDoc = new MutableDocument(partDocId);
+            partDoc.SetString("type", "part");
+            partDoc.SetString("uploadId", request.UploadId);
+            partDoc.SetInt("partNumber", request.PartNumber);
+            partDoc.SetDate("lastModified", DateTimeOffset.UtcNow);
+            partDoc.SetLong("size", content.Length);
+
+            // Store content as blob
+            var partBlob = new Blob("application/octet-stream", content);
+            partDoc.SetBlob("content", partBlob);
+
+            // Calculate ETag for the part
+            string etag;
+            using (var md5 = System.Security.Cryptography.MD5.Create())
+            {
+                var hash = md5.ComputeHash(content);
+                etag = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            }
+            partDoc.SetString("etag", etag);
+
+            _database.Save(partDoc);
+
+            return new UploadPartResponse
+            {
+                ETag = etag,
+                PartNumber = request.PartNumber,
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<WriteGetObjectResponseResponse> WriteGetObjectResponseAsync(WriteGetObjectResponseRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();

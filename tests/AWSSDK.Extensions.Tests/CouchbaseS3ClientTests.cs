@@ -1556,4 +1556,238 @@ public class CouchbaseS3ClientTests
     }
 
     #endregion
+
+    #region Multipart Upload Tests
+
+    [Test]
+    public async Task InitiateMultipartUpload_ReturnsUploadId()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+
+        // Act
+        var response = await _client.InitiateMultipartUploadAsync("test-bucket", "large-file.dat");
+
+        // Assert
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.UploadId, Is.Not.Null.And.Not.Empty);
+        Assert.That(response.BucketName, Is.EqualTo("test-bucket"));
+        Assert.That(response.Key, Is.EqualTo("large-file.dat"));
+    }
+
+    [Test]
+    public async Task UploadPart_ReturnsETag()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        var initResponse = await _client.InitiateMultipartUploadAsync("test-bucket", "large-file.dat");
+
+        var partContent = new byte[1024];
+        new Random().NextBytes(partContent);
+
+        var uploadRequest = new UploadPartRequest
+        {
+            BucketName = "test-bucket",
+            Key = "large-file.dat",
+            UploadId = initResponse.UploadId,
+            PartNumber = 1,
+            InputStream = new MemoryStream(partContent)
+        };
+
+        // Act
+        var response = await _client.UploadPartAsync(uploadRequest);
+
+        // Assert
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.ETag, Is.Not.Null.And.Not.Empty);
+        Assert.That(response.PartNumber, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task CompleteMultipartUpload_CreatesObject()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        var initResponse = await _client.InitiateMultipartUploadAsync("test-bucket", "large-file.dat");
+
+        // Upload two parts
+        var part1Content = Encoding.UTF8.GetBytes("Part1Content");
+        var part1Response = await _client.UploadPartAsync(new UploadPartRequest
+        {
+            BucketName = "test-bucket",
+            Key = "large-file.dat",
+            UploadId = initResponse.UploadId,
+            PartNumber = 1,
+            InputStream = new MemoryStream(part1Content)
+        });
+
+        var part2Content = Encoding.UTF8.GetBytes("Part2Content");
+        var part2Response = await _client.UploadPartAsync(new UploadPartRequest
+        {
+            BucketName = "test-bucket",
+            Key = "large-file.dat",
+            UploadId = initResponse.UploadId,
+            PartNumber = 2,
+            InputStream = new MemoryStream(part2Content)
+        });
+
+        var completeRequest = new CompleteMultipartUploadRequest
+        {
+            BucketName = "test-bucket",
+            Key = "large-file.dat",
+            UploadId = initResponse.UploadId
+        };
+        completeRequest.AddPartETags(
+            new PartETag(1, part1Response.ETag),
+            new PartETag(2, part2Response.ETag)
+        );
+
+        // Act
+        var response = await _client.CompleteMultipartUploadAsync(completeRequest);
+
+        // Assert
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.ETag, Does.EndWith("-2")); // Multipart ETag format
+
+        // Verify object was created
+        var getResponse = await _client.GetObjectAsync("test-bucket", "large-file.dat");
+        using var reader = new StreamReader(getResponse.ResponseStream);
+        var content = await reader.ReadToEndAsync();
+        Assert.That(content, Is.EqualTo("Part1ContentPart2Content"));
+    }
+
+    [Test]
+    public async Task AbortMultipartUpload_DeletesPartsAndUpload()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        var initResponse = await _client.InitiateMultipartUploadAsync("test-bucket", "large-file.dat");
+
+        // Upload a part
+        await _client.UploadPartAsync(new UploadPartRequest
+        {
+            BucketName = "test-bucket",
+            Key = "large-file.dat",
+            UploadId = initResponse.UploadId,
+            PartNumber = 1,
+            InputStream = new MemoryStream(Encoding.UTF8.GetBytes("content"))
+        });
+
+        // Act
+        var response = await _client.AbortMultipartUploadAsync("test-bucket", "large-file.dat", initResponse.UploadId);
+
+        // Assert
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+
+        // Verify upload was deleted
+        var listResponse = await _client.ListMultipartUploadsAsync("test-bucket");
+        Assert.That(listResponse.MultipartUploads, Is.Empty);
+    }
+
+    [Test]
+    public async Task ListMultipartUploads_ReturnsInProgressUploads()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        var upload1 = await _client.InitiateMultipartUploadAsync("test-bucket", "file1.dat");
+        var upload2 = await _client.InitiateMultipartUploadAsync("test-bucket", "file2.dat");
+
+        // Act
+        var response = await _client.ListMultipartUploadsAsync("test-bucket");
+
+        // Assert
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.MultipartUploads, Has.Count.EqualTo(2));
+
+        // Clean up
+        await _client.AbortMultipartUploadAsync("test-bucket", "file1.dat", upload1.UploadId);
+        await _client.AbortMultipartUploadAsync("test-bucket", "file2.dat", upload2.UploadId);
+    }
+
+    [Test]
+    public async Task ListParts_ReturnsUploadedParts()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        var initResponse = await _client.InitiateMultipartUploadAsync("test-bucket", "large-file.dat");
+
+        await _client.UploadPartAsync(new UploadPartRequest
+        {
+            BucketName = "test-bucket",
+            Key = "large-file.dat",
+            UploadId = initResponse.UploadId,
+            PartNumber = 1,
+            InputStream = new MemoryStream(Encoding.UTF8.GetBytes("Part1"))
+        });
+
+        await _client.UploadPartAsync(new UploadPartRequest
+        {
+            BucketName = "test-bucket",
+            Key = "large-file.dat",
+            UploadId = initResponse.UploadId,
+            PartNumber = 2,
+            InputStream = new MemoryStream(Encoding.UTF8.GetBytes("Part2"))
+        });
+
+        // Act
+        var response = await _client.ListPartsAsync("test-bucket", "large-file.dat", initResponse.UploadId);
+
+        // Assert
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.Parts, Has.Count.EqualTo(2));
+        Assert.That(response.Parts[0].PartNumber, Is.EqualTo(1));
+        Assert.That(response.Parts[1].PartNumber, Is.EqualTo(2));
+
+        // Clean up
+        await _client.AbortMultipartUploadAsync("test-bucket", "large-file.dat", initResponse.UploadId);
+    }
+
+    [Test]
+    public void UploadPart_InvalidPartNumber_ThrowsException()
+    {
+        // Arrange
+        _client.PutBucketAsync("test-bucket").Wait();
+        var initResponse = _client.InitiateMultipartUploadAsync("test-bucket", "file.dat").Result;
+
+        var request = new UploadPartRequest
+        {
+            BucketName = "test-bucket",
+            Key = "file.dat",
+            UploadId = initResponse.UploadId,
+            PartNumber = 0, // Invalid - must be 1-10000
+            InputStream = new MemoryStream(new byte[10])
+        };
+
+        // Act & Assert
+        var ex = Assert.ThrowsAsync<Amazon.S3.AmazonS3Exception>(
+            async () => await _client.UploadPartAsync(request));
+
+        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(ex.ErrorCode, Is.EqualTo("InvalidArgument"));
+    }
+
+    [Test]
+    public void UploadPart_NonExistentUpload_ThrowsException()
+    {
+        // Arrange
+        _client.PutBucketAsync("test-bucket").Wait();
+
+        var request = new UploadPartRequest
+        {
+            BucketName = "test-bucket",
+            Key = "file.dat",
+            UploadId = "non-existent-upload-id",
+            PartNumber = 1,
+            InputStream = new MemoryStream(new byte[10])
+        };
+
+        // Act & Assert
+        var ex = Assert.ThrowsAsync<Amazon.S3.AmazonS3Exception>(
+            async () => await _client.UploadPartAsync(request));
+
+        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        Assert.That(ex.ErrorCode, Is.EqualTo("NoSuchUpload"));
+    }
+
+    #endregion
 }
