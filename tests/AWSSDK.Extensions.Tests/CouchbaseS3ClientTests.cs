@@ -1302,4 +1302,258 @@ public class CouchbaseS3ClientTests
     }
 
     #endregion
+
+    #region Versioning Configuration Tests
+
+    [Test]
+    public async Task GetBucketVersioning_NewBucket_ReturnsOff()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+
+        // Act
+        var response = await _client.GetBucketVersioningAsync("test-bucket");
+
+        // Assert
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.VersioningConfig.Status, Is.EqualTo(VersionStatus.Off));
+    }
+
+    [Test]
+    public async Task PutBucketVersioning_EnableVersioning_Success()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+
+        var request = new PutBucketVersioningRequest
+        {
+            BucketName = "test-bucket",
+            VersioningConfig = new S3BucketVersioningConfig { Status = VersionStatus.Enabled }
+        };
+
+        // Act
+        var response = await _client.PutBucketVersioningAsync(request);
+
+        // Assert
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+
+        var getResponse = await _client.GetBucketVersioningAsync("test-bucket");
+        Assert.That(getResponse.VersioningConfig.Status, Is.EqualTo(VersionStatus.Enabled));
+    }
+
+    [Test]
+    public async Task PutBucketVersioning_SuspendVersioning_Success()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutBucketVersioningAsync(new PutBucketVersioningRequest
+        {
+            BucketName = "test-bucket",
+            VersioningConfig = new S3BucketVersioningConfig { Status = VersionStatus.Enabled }
+        });
+
+        // Act
+        var response = await _client.PutBucketVersioningAsync(new PutBucketVersioningRequest
+        {
+            BucketName = "test-bucket",
+            VersioningConfig = new S3BucketVersioningConfig { Status = VersionStatus.Suspended }
+        });
+
+        // Assert
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+
+        var getResponse = await _client.GetBucketVersioningAsync("test-bucket");
+        Assert.That(getResponse.VersioningConfig.Status, Is.EqualTo(VersionStatus.Suspended));
+    }
+
+    [Test]
+    public async Task PutBucketVersioning_ReEnableAfterSuspend_Success()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutBucketVersioningAsync(new PutBucketVersioningRequest
+        {
+            BucketName = "test-bucket",
+            VersioningConfig = new S3BucketVersioningConfig { Status = VersionStatus.Enabled }
+        });
+        await _client.PutBucketVersioningAsync(new PutBucketVersioningRequest
+        {
+            BucketName = "test-bucket",
+            VersioningConfig = new S3BucketVersioningConfig { Status = VersionStatus.Suspended }
+        });
+
+        // Act
+        var response = await _client.PutBucketVersioningAsync(new PutBucketVersioningRequest
+        {
+            BucketName = "test-bucket",
+            VersioningConfig = new S3BucketVersioningConfig { Status = VersionStatus.Enabled }
+        });
+
+        // Assert
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+
+        var getResponse = await _client.GetBucketVersioningAsync("test-bucket");
+        Assert.That(getResponse.VersioningConfig.Status, Is.EqualTo(VersionStatus.Enabled));
+    }
+
+    [Test]
+    public void GetBucketVersioning_BucketNotExists_ThrowsException()
+    {
+        // Act & Assert
+        var ex = Assert.ThrowsAsync<Amazon.S3.AmazonS3Exception>(
+            async () => await _client.GetBucketVersioningAsync("non-existent-bucket"));
+
+        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        Assert.That(ex.ErrorCode, Is.EqualTo("NoSuchBucket"));
+    }
+
+    [Test]
+    public void PutBucketVersioning_BucketNotExists_ThrowsException()
+    {
+        // Arrange
+        var request = new PutBucketVersioningRequest
+        {
+            BucketName = "non-existent-bucket",
+            VersioningConfig = new S3BucketVersioningConfig { Status = VersionStatus.Enabled }
+        };
+
+        // Act & Assert
+        var ex = Assert.ThrowsAsync<Amazon.S3.AmazonS3Exception>(
+            async () => await _client.PutBucketVersioningAsync(request));
+
+        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        Assert.That(ex.ErrorCode, Is.EqualTo("NoSuchBucket"));
+    }
+
+    #endregion
+
+    #region ListVersions Tests
+
+    [Test]
+    public async Task ListVersions_ReturnsVersions_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            ContentBody = "content"
+        });
+
+        // Act
+        var response = await _client.ListVersionsAsync("test-bucket");
+
+        // Assert
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.Versions, Has.Count.EqualTo(1));
+        Assert.That(response.Versions[0].Key, Is.EqualTo("test-key"));
+        Assert.That(response.Versions[0].IsLatest, Is.True);
+    }
+
+    [Test]
+    public async Task ListVersions_WithPrefix_FiltersVersions()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "dir1/file1.txt",
+            ContentBody = "content1"
+        });
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "dir2/file2.txt",
+            ContentBody = "content2"
+        });
+
+        // Act
+        var response = await _client.ListVersionsAsync("test-bucket", "dir1/");
+
+        // Assert
+        Assert.That(response.Versions, Has.Count.EqualTo(1));
+        Assert.That(response.Versions[0].Key, Is.EqualTo("dir1/file1.txt"));
+    }
+
+    [Test]
+    public async Task ListVersions_WithRequest_ReturnsVersions()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            ContentBody = "content"
+        });
+
+        var request = new ListVersionsRequest { BucketName = "test-bucket" };
+
+        // Act
+        var response = await _client.ListVersionsAsync(request);
+
+        // Assert
+        Assert.That(response.Versions, Has.Count.EqualTo(1));
+        Assert.That(response.Name, Is.EqualTo("test-bucket"));
+    }
+
+    [Test]
+    public async Task ListVersions_WithDelimiter_ReturnsCommonPrefixes()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "photos/image1.jpg",
+            ContentBody = "image1"
+        });
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "documents/file.txt",
+            ContentBody = "file"
+        });
+
+        var request = new ListVersionsRequest
+        {
+            BucketName = "test-bucket",
+            Delimiter = "/"
+        };
+
+        // Act
+        var response = await _client.ListVersionsAsync(request);
+
+        // Assert
+        Assert.That(response.CommonPrefixes, Has.Count.EqualTo(2));
+    }
+
+    [Test]
+    public void ListVersions_BucketNotExists_ThrowsException()
+    {
+        // Act & Assert
+        var ex = Assert.ThrowsAsync<Amazon.S3.AmazonS3Exception>(
+            async () => await _client.ListVersionsAsync("non-existent-bucket"));
+
+        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        Assert.That(ex.ErrorCode, Is.EqualTo("NoSuchBucket"));
+    }
+
+    [Test]
+    public async Task ListVersions_EmptyBucket_ReturnsEmptyList()
+    {
+        // Arrange
+        await _client.PutBucketAsync("empty-bucket");
+
+        // Act
+        var response = await _client.ListVersionsAsync("empty-bucket");
+
+        // Assert
+        Assert.That(response.Versions, Is.Empty);
+        Assert.That(response.DeleteMarkers, Is.Empty);
+    }
+
+    #endregion
 }

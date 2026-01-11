@@ -969,19 +969,231 @@ public class CouchbaseS3Client : IAmazonS3
         }, cancellationToken);
     }
 
-    public Task<ListVersionsResponse> ListVersionsAsync(string bucketName, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Lists all versions of objects in a bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the list of object versions.</returns>
+    public async Task<ListVersionsResponse> ListVersionsAsync(string bucketName, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var request = new ListVersionsRequest { BucketName = bucketName };
+        return await ListVersionsAsync(request, cancellationToken);
     }
 
-    public Task<ListVersionsResponse> ListVersionsAsync(string bucketName, string prefix, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Lists all versions of objects in a bucket with a prefix filter.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="prefix">The prefix to filter objects by.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the filtered list of object versions.</returns>
+    public async Task<ListVersionsResponse> ListVersionsAsync(string bucketName, string prefix, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var request = new ListVersionsRequest
+        {
+            BucketName = bucketName,
+            Prefix = prefix
+        };
+        return await ListVersionsAsync(request, cancellationToken);
     }
 
-    public Task<ListVersionsResponse> ListVersionsAsync(ListVersionsRequest request, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Lists all versions of objects in a bucket.
+    /// Returns both object versions and delete markers.
+    /// </summary>
+    /// <param name="request">The request containing bucket name and filter parameters.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing object versions and delete markers.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<ListVersionsResponse> ListVersionsAsync(ListVersionsRequest request, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        return await Task.Run(() =>
+        {
+            // Verify bucket exists
+            var bucketDoc = _database.GetDocument($"bucket::{request.BucketName}");
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            var versions = new List<S3ObjectVersion>();
+            var deleteMarkers = new List<DeleteMarkerEntry>();
+            var commonPrefixes = new HashSet<string>();
+
+            // Query for current objects
+            var objectQuery = QueryBuilder.Select(SelectResult.All())
+                .From(DataSource.Database(_database))
+                .Where(
+                    Expression.Property("type").EqualTo(Expression.String("object"))
+                    .And(Expression.Property("bucketName").EqualTo(Expression.String(request.BucketName)))
+                );
+
+            foreach (var result in objectQuery.Execute())
+            {
+                var dict = result.GetDictionary(0);
+                var key = dict.GetString("key");
+
+                // Apply prefix filter
+                if (!string.IsNullOrEmpty(request.Prefix) && !key.StartsWith(request.Prefix))
+                {
+                    continue;
+                }
+
+                // Apply key marker filter
+                if (!string.IsNullOrEmpty(request.KeyMarker) &&
+                    string.CompareOrdinal(key, request.KeyMarker) <= 0)
+                {
+                    continue;
+                }
+
+                // Handle delimiter for directory-like listing
+                if (!string.IsNullOrEmpty(request.Delimiter))
+                {
+                    var prefixLength = request.Prefix?.Length ?? 0;
+                    var delimiterIndex = key.IndexOf(request.Delimiter, prefixLength);
+
+                    if (delimiterIndex >= 0)
+                    {
+                        var commonPrefix = key.Substring(0, delimiterIndex + request.Delimiter.Length);
+                        commonPrefixes.Add(commonPrefix);
+                        continue;
+                    }
+                }
+
+                var lastModified = dict.GetDate("lastModified");
+                var versionId = dict.GetString("versionId") ?? "null"; // "null" is used for non-versioned objects
+
+                versions.Add(new S3ObjectVersion
+                {
+                    Key = key,
+                    VersionId = versionId,
+                    IsLatest = true,
+                    LastModified = lastModified.UtcDateTime,
+                    ETag = dict.GetString("etag"),
+                    Size = dict.GetLong("size"),
+                    StorageClass = S3StorageClass.Standard
+                });
+            }
+
+            // Query for versioned objects
+            var versionQuery = QueryBuilder.Select(SelectResult.All())
+                .From(DataSource.Database(_database))
+                .Where(
+                    Expression.Property("type").EqualTo(Expression.String("version"))
+                    .And(Expression.Property("bucketName").EqualTo(Expression.String(request.BucketName)))
+                );
+
+            foreach (var result in versionQuery.Execute())
+            {
+                var dict = result.GetDictionary(0);
+                var key = dict.GetString("key");
+
+                // Apply prefix filter
+                if (!string.IsNullOrEmpty(request.Prefix) && !key.StartsWith(request.Prefix))
+                {
+                    continue;
+                }
+
+                // Apply key marker filter
+                if (!string.IsNullOrEmpty(request.KeyMarker) &&
+                    string.CompareOrdinal(key, request.KeyMarker) <= 0)
+                {
+                    continue;
+                }
+
+                var lastModified = dict.GetDate("lastModified");
+                var versionId = dict.GetString("versionId");
+
+                versions.Add(new S3ObjectVersion
+                {
+                    Key = key,
+                    VersionId = versionId,
+                    IsLatest = false,
+                    LastModified = lastModified.UtcDateTime,
+                    ETag = dict.GetString("etag"),
+                    Size = dict.GetLong("size"),
+                    StorageClass = S3StorageClass.Standard
+                });
+            }
+
+            // Query for delete markers
+            var deleteMarkerQuery = QueryBuilder.Select(SelectResult.All())
+                .From(DataSource.Database(_database))
+                .Where(
+                    Expression.Property("type").EqualTo(Expression.String("deleteMarker"))
+                    .And(Expression.Property("bucketName").EqualTo(Expression.String(request.BucketName)))
+                );
+
+            foreach (var result in deleteMarkerQuery.Execute())
+            {
+                var dict = result.GetDictionary(0);
+                var key = dict.GetString("key");
+
+                // Apply prefix filter
+                if (!string.IsNullOrEmpty(request.Prefix) && !key.StartsWith(request.Prefix))
+                {
+                    continue;
+                }
+
+                var lastModified = dict.GetDate("lastModified");
+                var versionId = dict.GetString("versionId");
+                var isLatest = dict.GetBoolean("isLatest");
+
+                deleteMarkers.Add(new DeleteMarkerEntry
+                {
+                    Key = key,
+                    VersionId = versionId,
+                    IsLatest = isLatest,
+                    LastModified = lastModified.UtcDateTime
+                });
+            }
+
+            // Sort versions by key, then by lastModified descending
+            versions = versions
+                .OrderBy(v => v.Key)
+                .ThenByDescending(v => v.LastModified)
+                .ToList();
+
+            // Apply max keys
+            var maxKeys = request.MaxKeys > 0 ? request.MaxKeys : 1000;
+            var totalItems = versions.Count + deleteMarkers.Count;
+            var isTruncated = totalItems > maxKeys;
+
+            if (isTruncated)
+            {
+                versions = versions.Take(maxKeys).ToList();
+            }
+
+            var response = new ListVersionsResponse
+            {
+                Name = request.BucketName,
+                Prefix = request.Prefix,
+                KeyMarker = request.KeyMarker,
+                VersionIdMarker = request.VersionIdMarker,
+                Delimiter = request.Delimiter,
+                MaxKeys = maxKeys,
+                IsTruncated = isTruncated,
+                Versions = versions,
+                DeleteMarkers = deleteMarkers,
+                CommonPrefixes = commonPrefixes.OrderBy(p => p).Select(p => new CommonPrefix { Prefix = p }).ToList(),
+                HttpStatusCode = HttpStatusCode.OK
+            };
+
+            // Set markers for pagination
+            if (isTruncated && versions.Any())
+            {
+                var lastVersion = versions.Last();
+                response.NextKeyMarker = lastVersion.Key;
+                response.NextVersionIdMarker = lastVersion.VersionId;
+            }
+
+            return response;
+        }, cancellationToken);
     }
 
     #region Pre-signed URL Operations
@@ -1426,11 +1638,58 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<GetBucketTaggingResponse> GetBucketTaggingAsync(GetBucketTaggingRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<GetBucketVersioningResponse> GetBucketVersioningAsync(string bucketName, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Gets the versioning state of a bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the versioning state.</returns>
+    public async Task<GetBucketVersioningResponse> GetBucketVersioningAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        var request = new GetBucketVersioningRequest { BucketName = bucketName };
+        return await GetBucketVersioningAsync(request, cancellationToken);
+    }
 
-    public Task<GetBucketVersioningResponse> GetBucketVersioningAsync(GetBucketVersioningRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Gets the versioning state of a bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the versioning state (Off, Enabled, or Suspended).</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<GetBucketVersioningResponse> GetBucketVersioningAsync(GetBucketVersioningRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDoc = _database.GetDocument($"bucket::{request.BucketName}");
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            var versioningStatus = bucketDoc.GetString("versioningStatus");
+            var status = VersionStatus.Off;
+
+            if (versioningStatus == "Enabled")
+            {
+                status = VersionStatus.Enabled;
+            }
+            else if (versioningStatus == "Suspended")
+            {
+                status = VersionStatus.Suspended;
+            }
+
+            return new GetBucketVersioningResponse
+            {
+                VersioningConfig = new S3BucketVersioningConfig { Status = status },
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<GetBucketWebsiteResponse> GetBucketWebsiteAsync(string bucketName, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
@@ -1684,8 +1943,60 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<PutBucketTaggingResponse> PutBucketTaggingAsync(PutBucketTaggingRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<PutBucketVersioningResponse> PutBucketVersioningAsync(PutBucketVersioningRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Sets the versioning state of a bucket.
+    /// Once versioning is enabled on a bucket, it can never be returned to an Off state.
+    /// It can only be suspended.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name and versioning configuration.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating success.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<PutBucketVersioningResponse> PutBucketVersioningAsync(PutBucketVersioningRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDocId = $"bucket::{request.BucketName}";
+            var bucketDoc = _database.GetDocument(bucketDocId);
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            var currentStatus = bucketDoc.GetString("versioningStatus");
+            var newStatus = request.VersioningConfig?.Status?.Value;
+
+            // Validate state transitions:
+            // - Off -> Enabled: OK
+            // - Off -> Suspended: Not recommended but allowed
+            // - Enabled -> Suspended: OK
+            // - Suspended -> Enabled: OK
+            // - Enabled -> Off: NOT ALLOWED (versioning cannot be disabled once enabled)
+            if (currentStatus == "Enabled" && string.IsNullOrEmpty(newStatus))
+            {
+                throw new AmazonS3Exception("Versioning cannot be disabled once it has been enabled")
+                {
+                    StatusCode = HttpStatusCode.BadRequest,
+                    ErrorCode = "IllegalVersioningConfigurationException"
+                };
+            }
+
+            // Update the bucket document with versioning status
+            var mutableDoc = bucketDoc.ToMutable();
+            mutableDoc.SetString("versioningStatus", newStatus ?? "Off");
+
+            _database.Save(mutableDoc);
+
+            return new PutBucketVersioningResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<PutBucketWebsiteResponse> PutBucketWebsiteAsync(string bucketName, WebsiteConfiguration websiteConfiguration, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
