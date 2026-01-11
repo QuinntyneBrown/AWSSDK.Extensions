@@ -1,0 +1,272 @@
+<mxfile host="app.diagrams.net" modified="2026-01-11T12:00:00.000Z" agent="5.0" etag="roadmap-v1" version="21.0.0" type="device">
+  <diagram name="IAmazonS3 Implementation Roadmap" id="s3-couchbase-roadmap">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title" value="&lt;b&gt;IAmazonS3 Interface Implementation Roadmap&lt;/b&gt;&lt;br&gt;Couchbase Lite Backend" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontColor=#1a1a2e;" vertex="1" parent="1">
+          <mxGeometry x="400" y="20" width="800" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Subtitle -->
+        <mxCell id="subtitle" value="Total Methods: 156+ | Currently Implemented: 16 (~10%) | Remaining: 140+" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="400" y="70" width="800" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- Phase 1: Foundation (COMPLETED) -->
+        <mxCell id="phase1-container" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="120" width="280" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="phase1-header" value="&lt;b&gt;PHASE 1: FOUNDATION&lt;/b&gt;&lt;br&gt;[COMPLETED]" style="text;html=1;strokeColor=none;fillColor=#82b366;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=14;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="50" y="130" width="260" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="phase1-bucket" value="&lt;b&gt;Bucket Operations&lt;/b&gt;&lt;br&gt;- PutBucketAsync&lt;br&gt;- DeleteBucketAsync&lt;br&gt;- ListBucketsAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="55" y="180" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="phase1-object" value="&lt;b&gt;Object Operations&lt;/b&gt;&lt;br&gt;- PutObjectAsync&lt;br&gt;- GetObjectAsync&lt;br&gt;- DeleteObjectAsync&lt;br&gt;- DeleteObjectsAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="55" y="270" width="250" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="phase1-listing" value="&lt;b&gt;Listing &amp;amp; Config&lt;/b&gt;&lt;br&gt;- ListObjectsV2Async&lt;br&gt;- IClientConfig&lt;br&gt;- IDisposable" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="55" y="370" width="250" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Phase 2: Essential Operations -->
+        <mxCell id="phase2-container" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="340" y="120" width="280" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="phase2-header" value="&lt;b&gt;PHASE 2: ESSENTIAL OPS&lt;/b&gt;&lt;br&gt;Priority: HIGH" style="text;html=1;strokeColor=none;fillColor=#d6b656;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=14;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="350" y="130" width="260" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="phase2-metadata" value="&lt;b&gt;Metadata Operations&lt;/b&gt;&lt;br&gt;- GetObjectMetadataAsync (3)&lt;br&gt;- HeadBucketAsync&lt;br&gt;- DoesS3BucketExistAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="355" y="180" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="phase2-copy" value="&lt;b&gt;Copy Operations&lt;/b&gt;&lt;br&gt;- CopyObjectAsync (3 overloads)&lt;br&gt;- CopyPartAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="355" y="270" width="250" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="phase2-presigned" value="&lt;b&gt;Pre-signed URLs&lt;/b&gt;&lt;br&gt;- GetPreSignedURL&lt;br&gt;- GetPreSignedURLAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="355" y="340" width="250" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="phase2-legacy" value="&lt;b&gt;Legacy API&lt;/b&gt;&lt;br&gt;- ListObjectsAsync (3 overloads)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="355" y="410" width="250" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Phase 3: Versioning -->
+        <mxCell id="phase3-container" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="640" y="120" width="280" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="phase3-header" value="&lt;b&gt;PHASE 3: VERSIONING&lt;/b&gt;&lt;br&gt;Priority: MEDIUM" style="text;html=1;strokeColor=none;fillColor=#6c8ebf;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=14;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="650" y="130" width="260" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="phase3-schema" value="&lt;b&gt;Schema Updates&lt;/b&gt;&lt;br&gt;- Version ID generation&lt;br&gt;- Version chain tracking&lt;br&gt;- Delete markers support" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="655" y="180" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="phase3-config" value="&lt;b&gt;Versioning Config&lt;/b&gt;&lt;br&gt;- GetBucketVersioningAsync&lt;br&gt;- PutBucketVersioningAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="655" y="270" width="250" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="phase3-ops" value="&lt;b&gt;Version Operations&lt;/b&gt;&lt;br&gt;- ListVersionsAsync (3)&lt;br&gt;- GetObject w/ VersionId&lt;br&gt;- DeleteObject w/ VersionId" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="655" y="340" width="250" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Phase 4: Multipart Upload -->
+        <mxCell id="phase4-container" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="940" y="120" width="280" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="phase4-header" value="&lt;b&gt;PHASE 4: MULTIPART UPLOAD&lt;/b&gt;&lt;br&gt;Priority: MEDIUM" style="text;html=1;strokeColor=none;fillColor=#9673a6;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=14;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="950" y="130" width="260" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="phase4-schema" value="&lt;b&gt;Schema Updates&lt;/b&gt;&lt;br&gt;- Upload tracking documents&lt;br&gt;- Part storage schema&lt;br&gt;- Upload state management" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="955" y="180" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="phase4-init" value="&lt;b&gt;Upload Lifecycle&lt;/b&gt;&lt;br&gt;- InitiateMultipartUploadAsync&lt;br&gt;- AbortMultipartUploadAsync&lt;br&gt;- CompleteMultipartUploadAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="955" y="270" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="phase4-parts" value="&lt;b&gt;Part Operations&lt;/b&gt;&lt;br&gt;- UploadPartAsync&lt;br&gt;- ListPartsAsync&lt;br&gt;- ListMultipartUploadsAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="955" y="360" width="250" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Phase 5: Access Control -->
+        <mxCell id="phase5-container" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="120" width="280" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="phase5-header" value="&lt;b&gt;PHASE 5: ACCESS CONTROL&lt;/b&gt;&lt;br&gt;Priority: MEDIUM" style="text;html=1;strokeColor=none;fillColor=#b85450;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=14;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="130" width="260" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="phase5-acl" value="&lt;b&gt;ACL Operations&lt;/b&gt;&lt;br&gt;- GetACLAsync (bucket/object)&lt;br&gt;- PutACLAsync&lt;br&gt;- MakeObjectPublicAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="1255" y="180" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="phase5-policy" value="&lt;b&gt;Bucket Policies&lt;/b&gt;&lt;br&gt;- GetBucketPolicyAsync&lt;br&gt;- PutBucketPolicyAsync&lt;br&gt;- DeleteBucketPolicyAsync&lt;br&gt;- GetBucketPolicyStatusAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="1255" y="270" width="250" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="phase5-public" value="&lt;b&gt;Public Access&lt;/b&gt;&lt;br&gt;- GetPublicAccessBlockAsync&lt;br&gt;- PutPublicAccessBlockAsync&lt;br&gt;- DeletePublicAccessBlockAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="1255" y="370" width="250" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Row 2 - Phases 6-8 -->
+
+        <!-- Phase 6: Configuration -->
+        <mxCell id="phase6-container" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="480" width="380" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="phase6-header" value="&lt;b&gt;PHASE 6: BUCKET CONFIGURATION&lt;/b&gt;&lt;br&gt;Priority: LOW" style="text;html=1;strokeColor=none;fillColor=#d79b00;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=14;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="50" y="490" width="360" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="phase6-encryption" value="&lt;b&gt;Encryption&lt;/b&gt;&lt;br&gt;- GetBucketEncryptionAsync&lt;br&gt;- PutBucketEncryptionAsync&lt;br&gt;- DeleteBucketEncryptionAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="55" y="540" width="170" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="phase6-lifecycle" value="&lt;b&gt;Lifecycle Rules&lt;/b&gt;&lt;br&gt;- GetLifecycleConfigurationAsync&lt;br&gt;- PutLifecycleConfigurationAsync&lt;br&gt;- DeleteLifecycleConfigurationAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="235" y="540" width="170" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="phase6-cors" value="&lt;b&gt;CORS &amp;amp; Website&lt;/b&gt;&lt;br&gt;- GetCORSConfigurationAsync&lt;br&gt;- PutCORSConfigurationAsync&lt;br&gt;- GetBucketWebsiteAsync&lt;br&gt;- PutBucketWebsiteAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="55" y="630" width="170" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="phase6-logging" value="&lt;b&gt;Logging &amp;amp; Notification&lt;/b&gt;&lt;br&gt;- GetBucketLoggingAsync&lt;br&gt;- PutBucketLoggingAsync&lt;br&gt;- GetBucketNotificationAsync&lt;br&gt;- PutBucketNotificationAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="235" y="630" width="170" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="phase6-other" value="&lt;b&gt;Other Configs:&lt;/b&gt; Tagging, Replication, Metrics, Inventory, Analytics, IntelligentTiering, OwnershipControls, RequestPayment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;align=center;verticalAlign=middle;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="55" y="740" width="350" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Phase 7: Object Features -->
+        <mxCell id="phase7-container" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#56a764;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="440" y="480" width="380" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="phase7-header" value="&lt;b&gt;PHASE 7: OBJECT FEATURES&lt;/b&gt;&lt;br&gt;Priority: LOW" style="text;html=1;strokeColor=none;fillColor=#56a764;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=14;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="450" y="490" width="360" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="phase7-tagging" value="&lt;b&gt;Object Tagging&lt;/b&gt;&lt;br&gt;- GetObjectTaggingAsync&lt;br&gt;- PutObjectTaggingAsync&lt;br&gt;- DeleteObjectTaggingAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#56a764;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="455" y="540" width="170" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="phase7-lock" value="&lt;b&gt;Object Lock&lt;/b&gt;&lt;br&gt;- GetObjectLockConfigurationAsync&lt;br&gt;- PutObjectLockConfigurationAsync&lt;br&gt;- GetObjectRetentionAsync&lt;br&gt;- PutObjectRetentionAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#56a764;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="635" y="540" width="170" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="phase7-legal" value="&lt;b&gt;Legal Hold&lt;/b&gt;&lt;br&gt;- GetObjectLegalHoldAsync&lt;br&gt;- PutObjectLegalHoldAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#56a764;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="455" y="630" width="170" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="phase7-restore" value="&lt;b&gt;Restore &amp;amp; Attributes&lt;/b&gt;&lt;br&gt;- RestoreObjectAsync&lt;br&gt;- GetObjectAttributesAsync&lt;br&gt;- GetObjectTorrentAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#56a764;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="635" y="650" width="170" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="phase7-glacier" value="Includes Glacier restore support and object class transitions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#56a764;align=center;verticalAlign=middle;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="455" y="740" width="350" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Phase 8: Advanced Features -->
+        <mxCell id="phase8-container" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="840" y="480" width="380" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="phase8-header" value="&lt;b&gt;PHASE 8: ADVANCED FEATURES&lt;/b&gt;&lt;br&gt;Priority: OPTIONAL" style="text;html=1;strokeColor=none;fillColor=#666666;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=14;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="850" y="490" width="360" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="phase8-select" value="&lt;b&gt;S3 Select&lt;/b&gt;&lt;br&gt;- SelectObjectContentAsync&lt;br&gt;- SQL-like query support&lt;br&gt;- JSON/CSV/Parquet parsing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="855" y="540" width="170" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="phase8-lambda" value="&lt;b&gt;Object Lambda&lt;/b&gt;&lt;br&gt;- WriteGetObjectResponseAsync&lt;br&gt;- Transform on retrieval" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="1035" y="540" width="170" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="phase8-directory" value="&lt;b&gt;Directory Buckets&lt;/b&gt;&lt;br&gt;- ListDirectoryBucketsAsync&lt;br&gt;- CreateSessionAsync&lt;br&gt;- S3 Express One Zone" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="855" y="640" width="170" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="phase8-helpers" value="&lt;b&gt;Helper Methods&lt;/b&gt;&lt;br&gt;- EnsureBucketExistsAsync&lt;br&gt;- UploadObjectFromStreamAsync&lt;br&gt;- DownloadToFilePathAsync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="1035" y="620" width="170" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="phase8-paginator" value="&lt;b&gt;Paginators&lt;/b&gt;&lt;br&gt;- IS3PaginatorFactory&lt;br&gt;- Auto-pagination support" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="855" y="730" width="170" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="phase8-endpoint" value="&lt;b&gt;Endpoint Discovery&lt;/b&gt;&lt;br&gt;- DetermineServiceOperationEndpoint" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="1035" y="720" width="170" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Arrows showing dependencies -->
+        <mxCell id="arrow1-2" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#666666;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="phase1-container" target="phase2-container">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow2-3" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#666666;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="phase2-container" target="phase3-container">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow3-4" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#666666;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="phase3-container" target="phase4-container">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow4-5" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#666666;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="phase4-container" target="phase5-container">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow5-6" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#666666;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;curved=1;" edge="1" parent="1" source="phase5-container" target="phase6-container">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="230" y="460" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow6-7" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#666666;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="phase6-container" target="phase7-container">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow7-8" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#666666;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="phase7-container" target="phase8-container">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Legend -->
+        <mxCell id="legend-container" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="480" width="280" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-title" value="&lt;b&gt;LEGEND &amp;amp; STATISTICS&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=#333333;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=14;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="490" width="260" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend-completed" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="530" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-completed-text" value="Completed (16 methods)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1290" y="530" width="200" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend-high" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="560" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-high-text" value="High Priority (~15 methods)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1290" y="560" width="200" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend-medium" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="590" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-medium-text" value="Medium Priority (~35 methods)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1290" y="590" width="200" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend-low" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="620" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-low-text" value="Low Priority (~50 methods)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1290" y="620" width="200" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend-optional" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="650" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-optional-text" value="Optional (~40 methods)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1290" y="650" width="200" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend-divider" value="" style="line;strokeWidth=1;html=1;strokeColor=#999999;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="680" width="250" height="10" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend-stats" value="&lt;b&gt;Implementation Stats&lt;/b&gt;&lt;br&gt;&lt;br&gt;Total IAmazonS3 Methods: ~156&lt;br&gt;Currently Implemented: 16&lt;br&gt;Remaining: ~140&lt;br&gt;&lt;br&gt;Current Coverage: ~10%&lt;br&gt;After Phase 2: ~20%&lt;br&gt;After Phase 4: ~40%&lt;br&gt;After Phase 6: ~70%&lt;br&gt;Complete: 100%" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="1255" y="695" width="260" height="180" as="geometry" />
+        </mxCell>
+
+        <!-- Technical Notes -->
+        <mxCell id="notes-container" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#999999;strokeWidth=1;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="840" width="1180" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="notes-title" value="&lt;b&gt;TECHNICAL IMPLEMENTATION NOTES&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="50" y="850" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="notes-content" value="&lt;b&gt;Storage Backend:&lt;/b&gt; Couchbase Lite (Document DB) | &lt;b&gt;Framework:&lt;/b&gt; .NET 9 | &lt;b&gt;Package:&lt;/b&gt; Couchbase.Lite 3.1.9&lt;br&gt;&lt;br&gt;&lt;b&gt;Document Schema:&lt;/b&gt; Buckets (bucket::{name}), Objects (object::{bucket}::{key}), Versions (version::{bucket}::{key}::{versionId}), Parts (part::{uploadId}::{partNum})&lt;br&gt;&lt;br&gt;&lt;b&gt;Key Decisions:&lt;/b&gt; Use InBatch() for transactions | MD5-based ETags | Blob storage for content | Indexes for queries | Continuation tokens for pagination" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=10;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="50" y="875" width="1160" height="80" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
