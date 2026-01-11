@@ -560,17 +560,180 @@ public class CouchbaseS3Client : IAmazonS3
 
     #endregion
 
+    #region Copy Operations
+
+    /// <summary>
+    /// Copies an object from one location to another within the Couchbase Lite storage.
+    /// </summary>
+    /// <param name="sourceBucket">The name of the source bucket.</param>
+    /// <param name="sourceKey">The key of the source object.</param>
+    /// <param name="destinationBucket">The name of the destination bucket.</param>
+    /// <param name="destinationKey">The key for the destination object.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing information about the copied object.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the source object or destination bucket does not exist.</exception>
+    public async Task<CopyObjectResponse> CopyObjectAsync(string sourceBucket, string sourceKey, string destinationBucket, string destinationKey, CancellationToken cancellationToken = default)
+    {
+        var request = new CopyObjectRequest
+        {
+            SourceBucket = sourceBucket,
+            SourceKey = sourceKey,
+            DestinationBucket = destinationBucket,
+            DestinationKey = destinationKey
+        };
+        return await CopyObjectAsync(request, cancellationToken);
+    }
+
+    /// <summary>
+    /// Copies an object from one location to another within the Couchbase Lite storage.
+    /// </summary>
+    /// <param name="request">The request containing source and destination information.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing information about the copied object.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the source object or destination bucket does not exist.</exception>
+    public async Task<CopyObjectResponse> CopyObjectAsync(CopyObjectRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            // Verify destination bucket exists
+            var destBucketDoc = _database.GetDocument($"bucket::{request.DestinationBucket}");
+            if (destBucketDoc == null)
+            {
+                throw new AmazonS3Exception("Destination bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            // Get source object (handling version if specified)
+            Document? sourceDoc;
+            if (!string.IsNullOrEmpty(request.SourceVersionId))
+            {
+                sourceDoc = _database.GetDocument($"version::{request.SourceBucket}::{request.SourceKey}::{request.SourceVersionId}");
+                if (sourceDoc == null)
+                {
+                    throw new AmazonS3Exception("The specified version does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchVersion"
+                    };
+                }
+            }
+            else
+            {
+                sourceDoc = _database.GetDocument($"object::{request.SourceBucket}::{request.SourceKey}");
+                if (sourceDoc == null)
+                {
+                    throw new AmazonS3Exception("Source object does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchKey"
+                    };
+                }
+            }
+
+            // Create destination document
+            var destObjectId = $"object::{request.DestinationBucket}::{request.DestinationKey}";
+            var destDoc = new MutableDocument(destObjectId);
+
+            // Copy core properties
+            destDoc.SetString("type", "object");
+            destDoc.SetString("bucketName", request.DestinationBucket);
+            destDoc.SetString("key", request.DestinationKey);
+            destDoc.SetString("contentType", sourceDoc.GetString("contentType"));
+            destDoc.SetDate("lastModified", DateTimeOffset.UtcNow);
+            destDoc.SetLong("size", sourceDoc.GetLong("size"));
+
+            // Extract prefix for efficient prefix searches
+            var lastSlash = request.DestinationKey.LastIndexOf('/');
+            if (lastSlash > 0)
+            {
+                destDoc.SetString("prefix", request.DestinationKey.Substring(0, lastSlash + 1));
+            }
+
+            // Copy blob content
+            var sourceBlob = sourceDoc.GetBlob("content");
+            if (sourceBlob != null)
+            {
+                // Create a new blob from the source content
+                byte[] content;
+                using (var ms = new MemoryStream())
+                {
+                    sourceBlob.ContentStream?.CopyTo(ms);
+                    content = ms.ToArray();
+                }
+                var destBlob = new Blob(sourceBlob.ContentType ?? "application/octet-stream", content);
+                destDoc.SetBlob("content", destBlob);
+            }
+
+            // Handle metadata based on MetadataDirective
+            if (request.MetadataDirective == S3MetadataDirective.REPLACE && request.Metadata?.Count > 0)
+            {
+                // Use the new metadata from the request
+                var metadataDict = new MutableDictionaryObject();
+                foreach (var key in request.Metadata.Keys)
+                {
+                    metadataDict.SetString(key, request.Metadata[key]);
+                }
+                destDoc.SetDictionary("metadata", metadataDict);
+            }
+            else
+            {
+                // Copy metadata from source (COPY directive or no metadata specified)
+                var sourceMetadata = sourceDoc.GetDictionary("metadata");
+                if (sourceMetadata != null)
+                {
+                    var metadataDict = new MutableDictionaryObject();
+                    foreach (var key in sourceMetadata.Keys)
+                    {
+                        metadataDict.SetString(key, sourceMetadata.GetString(key));
+                    }
+                    destDoc.SetDictionary("metadata", metadataDict);
+                }
+            }
+
+            // Calculate new ETag
+            string etag;
+            if (sourceBlob != null)
+            {
+                byte[] content;
+                using (var ms = new MemoryStream())
+                {
+                    sourceBlob.ContentStream?.CopyTo(ms);
+                    content = ms.ToArray();
+                }
+                using (var md5 = System.Security.Cryptography.MD5.Create())
+                {
+                    var hash = md5.ComputeHash(content);
+                    etag = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                }
+            }
+            else
+            {
+                using (var md5 = System.Security.Cryptography.MD5.Create())
+                {
+                    var hash = md5.ComputeHash(Array.Empty<byte>());
+                    etag = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                }
+            }
+            destDoc.SetString("etag", etag);
+
+            _database.Save(destDoc);
+
+            return new CopyObjectResponse
+            {
+                ETag = etag,
+                LastModified = destDoc.GetDate("lastModified").UtcDateTime,
+                SourceVersionId = request.SourceVersionId,
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
+
+    #endregion
+
     #region Not Implemented Operations
-
-    public Task<CopyObjectResponse> CopyObjectAsync(string sourceBucket, string sourceKey, string destinationBucket, string destinationKey, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task<CopyObjectResponse> CopyObjectAsync(CopyObjectRequest request, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
 
     /// <summary>
     /// Retrieves metadata for an object without returning the object itself.
@@ -704,14 +867,52 @@ public class CouchbaseS3Client : IAmazonS3
         throw new NotImplementedException();
     }
 
-    public Task<CopyObjectResponse> CopyObjectAsync(string sourceBucket, string sourceKey, string destinationBucket, string destinationKey, string sourceVersionId, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Copies a specific version of an object from one location to another.
+    /// </summary>
+    /// <param name="sourceBucket">The name of the source bucket.</param>
+    /// <param name="sourceKey">The key of the source object.</param>
+    /// <param name="destinationBucket">The name of the destination bucket.</param>
+    /// <param name="destinationKey">The key for the destination object.</param>
+    /// <param name="sourceVersionId">The version ID of the source object to copy.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing information about the copied object.</returns>
+    public async Task<CopyObjectResponse> CopyObjectAsync(string sourceBucket, string sourceKey, string destinationBucket, string destinationKey, string sourceVersionId, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var request = new CopyObjectRequest
+        {
+            SourceBucket = sourceBucket,
+            SourceKey = sourceKey,
+            DestinationBucket = destinationBucket,
+            DestinationKey = destinationKey,
+            SourceVersionId = sourceVersionId
+        };
+        return await CopyObjectAsync(request, cancellationToken);
     }
 
-    public Task<CopyPartResponse> CopyPartAsync(string sourceBucket, string sourceKey, string destinationBucket, string destinationKey, string uploadId, string partNumber, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Copies a part of an object as part of a multipart upload operation.
+    /// </summary>
+    /// <param name="sourceBucket">The name of the source bucket.</param>
+    /// <param name="sourceKey">The key of the source object.</param>
+    /// <param name="destinationBucket">The name of the destination bucket.</param>
+    /// <param name="destinationKey">The key for the destination object.</param>
+    /// <param name="uploadId">The upload ID of the multipart upload.</param>
+    /// <param name="partNumber">The part number (string format for compatibility).</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the ETag of the copied part.</returns>
+    public async Task<CopyPartResponse> CopyPartAsync(string sourceBucket, string sourceKey, string destinationBucket, string destinationKey, string uploadId, string partNumber, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var request = new CopyPartRequest
+        {
+            SourceBucket = sourceBucket,
+            SourceKey = sourceKey,
+            DestinationBucket = destinationBucket,
+            DestinationKey = destinationKey,
+            UploadId = uploadId,
+            PartNumber = int.Parse(partNumber)
+        };
+        return await CopyPartAsync(request, cancellationToken);
     }
 
     public Task<CreateSessionResponse> CreateSessionAsync(CreateSessionRequest request, CancellationToken cancellationToken = default)
@@ -816,11 +1017,153 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<CompleteMultipartUploadResponse> CompleteMultipartUploadAsync(CompleteMultipartUploadRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<CopyPartResponse> CopyPartAsync(string sourceBucket, string sourceKey, string destinationBucket, string destinationKey, string uploadId, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Copies a part of an object as part of a multipart upload operation.
+    /// </summary>
+    /// <param name="sourceBucket">The name of the source bucket.</param>
+    /// <param name="sourceKey">The key of the source object.</param>
+    /// <param name="destinationBucket">The name of the destination bucket.</param>
+    /// <param name="destinationKey">The key for the destination object.</param>
+    /// <param name="uploadId">The upload ID of the multipart upload.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the ETag of the copied part.</returns>
+    public async Task<CopyPartResponse> CopyPartAsync(string sourceBucket, string sourceKey, string destinationBucket, string destinationKey, string uploadId, CancellationToken cancellationToken = default)
+    {
+        var request = new CopyPartRequest
+        {
+            SourceBucket = sourceBucket,
+            SourceKey = sourceKey,
+            DestinationBucket = destinationBucket,
+            DestinationKey = destinationKey,
+            UploadId = uploadId,
+            PartNumber = 1 // Default part number
+        };
+        return await CopyPartAsync(request, cancellationToken);
+    }
 
-    public Task<CopyPartResponse> CopyPartAsync(CopyPartRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Copies a part of an object as part of a multipart upload operation.
+    /// </summary>
+    /// <param name="request">The request containing source, destination, and part information.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the ETag of the copied part.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the source object, upload, or bucket does not exist.</exception>
+    public async Task<CopyPartResponse> CopyPartAsync(CopyPartRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            // Validate part number (S3 allows 1-10000)
+            if (request.PartNumber < 1 || request.PartNumber > 10000)
+            {
+                throw new AmazonS3Exception("Part number must be between 1 and 10000")
+                {
+                    StatusCode = HttpStatusCode.BadRequest,
+                    ErrorCode = "InvalidArgument"
+                };
+            }
+
+            // Verify the upload exists
+            var uploadDoc = _database.GetDocument($"upload::{request.UploadId}");
+            if (uploadDoc == null)
+            {
+                throw new AmazonS3Exception("The specified upload does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchUpload"
+                };
+            }
+
+            // Get source object
+            Document? sourceDoc;
+            if (!string.IsNullOrEmpty(request.SourceVersionId))
+            {
+                sourceDoc = _database.GetDocument($"version::{request.SourceBucket}::{request.SourceKey}::{request.SourceVersionId}");
+                if (sourceDoc == null)
+                {
+                    throw new AmazonS3Exception("The specified version does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchVersion"
+                    };
+                }
+            }
+            else
+            {
+                sourceDoc = _database.GetDocument($"object::{request.SourceBucket}::{request.SourceKey}");
+                if (sourceDoc == null)
+                {
+                    throw new AmazonS3Exception("Source object does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchKey"
+                    };
+                }
+            }
+
+            // Get the content to copy (optionally with byte range)
+            var sourceBlob = sourceDoc.GetBlob("content");
+            byte[] partContent;
+
+            if (sourceBlob != null)
+            {
+                using (var ms = new MemoryStream())
+                {
+                    sourceBlob.ContentStream?.CopyTo(ms);
+                    var fullContent = ms.ToArray();
+
+                    // Handle byte range if specified
+                    if (request.FirstByte.HasValue && request.LastByte.HasValue)
+                    {
+                        var firstByte = (int)request.FirstByte.Value;
+                        var lastByte = (int)Math.Min(request.LastByte.Value, fullContent.Length - 1);
+                        var length = lastByte - firstByte + 1;
+                        partContent = new byte[length];
+                        Array.Copy(fullContent, firstByte, partContent, 0, length);
+                    }
+                    else
+                    {
+                        partContent = fullContent;
+                    }
+                }
+            }
+            else
+            {
+                partContent = Array.Empty<byte>();
+            }
+
+            // Store the part
+            var partDocId = $"part::{request.UploadId}::{request.PartNumber}";
+            var partDoc = new MutableDocument(partDocId);
+            partDoc.SetString("type", "part");
+            partDoc.SetString("uploadId", request.UploadId);
+            partDoc.SetInt("partNumber", request.PartNumber);
+            partDoc.SetDate("lastModified", DateTimeOffset.UtcNow);
+            partDoc.SetLong("size", partContent.Length);
+
+            // Store content as blob
+            var partBlob = new Blob("application/octet-stream", partContent);
+            partDoc.SetBlob("content", partBlob);
+
+            // Calculate ETag for the part
+            string etag;
+            using (var md5 = System.Security.Cryptography.MD5.Create())
+            {
+                var hash = md5.ComputeHash(partContent);
+                etag = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            }
+            partDoc.SetString("etag", etag);
+
+            _database.Save(partDoc);
+
+            return new CopyPartResponse
+            {
+                ETag = etag,
+                LastModified = partDoc.GetDate("lastModified").UtcDateTime,
+                PartNumber = request.PartNumber,
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<DeleteBucketAnalyticsConfigurationResponse> DeleteBucketAnalyticsConfigurationAsync(DeleteBucketAnalyticsConfigurationRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();

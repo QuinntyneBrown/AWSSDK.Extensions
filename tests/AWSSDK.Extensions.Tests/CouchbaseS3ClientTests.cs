@@ -1,3 +1,4 @@
+using Amazon.S3;
 using Amazon.S3.Model;
 using AWSSDK.Extensions;
 using System.Net;
@@ -580,6 +581,216 @@ public class CouchbaseS3ClientTests
 
         // Assert
         Assert.That(exists, Is.False);
+    }
+
+    #endregion
+
+    #region Copy Operations Tests
+
+    [Test]
+    public async Task CopyObject_CopiesObject_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("source-bucket");
+        await _client.PutBucketAsync("dest-bucket");
+        var content = "Test content to copy";
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "source-bucket",
+            Key = "source-key",
+            ContentBody = content
+        });
+
+        // Act
+        var response = await _client.CopyObjectAsync(
+            "source-bucket", "source-key",
+            "dest-bucket", "dest-key");
+
+        // Assert
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.ETag, Is.Not.Null.And.Not.Empty);
+
+        // Verify the copy was successful
+        var getResponse = await _client.GetObjectAsync("dest-bucket", "dest-key");
+        using var reader = new StreamReader(getResponse.ResponseStream);
+        var copiedContent = await reader.ReadToEndAsync();
+        Assert.That(copiedContent, Is.EqualTo(content));
+    }
+
+    [Test]
+    public async Task CopyObject_WithRequest_CopiesObject_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("source-bucket");
+        await _client.PutBucketAsync("dest-bucket");
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "source-bucket",
+            Key = "source-key",
+            ContentBody = "content"
+        });
+
+        var request = new CopyObjectRequest
+        {
+            SourceBucket = "source-bucket",
+            SourceKey = "source-key",
+            DestinationBucket = "dest-bucket",
+            DestinationKey = "new-key"
+        };
+
+        // Act
+        var response = await _client.CopyObjectAsync(request);
+
+        // Assert
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.ETag, Is.Not.Null);
+    }
+
+    [Test]
+    public async Task CopyObject_CopiesMetadata_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("source-bucket");
+        await _client.PutBucketAsync("dest-bucket");
+        var putRequest = new PutObjectRequest
+        {
+            BucketName = "source-bucket",
+            Key = "source-key",
+            ContentBody = "content"
+        };
+        putRequest.Metadata.Add("custom-key", "custom-value");
+        await _client.PutObjectAsync(putRequest);
+
+        // Act
+        await _client.CopyObjectAsync("source-bucket", "source-key", "dest-bucket", "dest-key");
+
+        // Assert
+        var getResponse = await _client.GetObjectAsync("dest-bucket", "dest-key");
+        Assert.That(getResponse.Metadata["custom-key"], Is.EqualTo("custom-value"));
+    }
+
+    [Test]
+    public async Task CopyObject_WithReplaceMetadata_ReplacesMetadata()
+    {
+        // Arrange
+        await _client.PutBucketAsync("source-bucket");
+        await _client.PutBucketAsync("dest-bucket");
+        var putRequest = new PutObjectRequest
+        {
+            BucketName = "source-bucket",
+            Key = "source-key",
+            ContentBody = "content"
+        };
+        putRequest.Metadata.Add("original-key", "original-value");
+        await _client.PutObjectAsync(putRequest);
+
+        var copyRequest = new CopyObjectRequest
+        {
+            SourceBucket = "source-bucket",
+            SourceKey = "source-key",
+            DestinationBucket = "dest-bucket",
+            DestinationKey = "dest-key",
+            MetadataDirective = S3MetadataDirective.REPLACE
+        };
+        copyRequest.Metadata.Add("new-key", "new-value");
+
+        // Act
+        await _client.CopyObjectAsync(copyRequest);
+
+        // Assert
+        var getResponse = await _client.GetObjectAsync("dest-bucket", "dest-key");
+        Assert.That(getResponse.Metadata.ContainsKey("original-key"), Is.False);
+        Assert.That(getResponse.Metadata["new-key"], Is.EqualTo("new-value"));
+    }
+
+    [Test]
+    public void CopyObject_SourceNotExists_ThrowsException()
+    {
+        // Arrange
+        _client.PutBucketAsync("dest-bucket").Wait();
+
+        // Act & Assert
+        var ex = Assert.ThrowsAsync<Amazon.S3.AmazonS3Exception>(
+            async () => await _client.CopyObjectAsync(
+                "source-bucket", "non-existent",
+                "dest-bucket", "dest-key"));
+
+        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        Assert.That(ex.ErrorCode, Is.EqualTo("NoSuchKey"));
+    }
+
+    [Test]
+    public async Task CopyObject_DestBucketNotExists_ThrowsException()
+    {
+        // Arrange
+        await _client.PutBucketAsync("source-bucket");
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "source-bucket",
+            Key = "source-key",
+            ContentBody = "content"
+        });
+
+        // Act & Assert
+        var ex = Assert.ThrowsAsync<Amazon.S3.AmazonS3Exception>(
+            async () => await _client.CopyObjectAsync(
+                "source-bucket", "source-key",
+                "non-existent-bucket", "dest-key"));
+
+        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        Assert.That(ex.ErrorCode, Is.EqualTo("NoSuchBucket"));
+    }
+
+    [Test]
+    public async Task CopyObject_SameBucket_DifferentKey_Succeeds()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "original-key",
+            ContentBody = "content"
+        });
+
+        // Act
+        var response = await _client.CopyObjectAsync(
+            "test-bucket", "original-key",
+            "test-bucket", "copied-key");
+
+        // Assert
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+
+        // Verify both objects exist
+        var listResponse = await _client.ListObjectsV2Async(new ListObjectsV2Request
+        {
+            BucketName = "test-bucket"
+        });
+        Assert.That(listResponse.S3Objects, Has.Count.EqualTo(2));
+    }
+
+    [Test]
+    public async Task CopyObject_VerifyDataIntegrity_ETags_Match()
+    {
+        // Arrange
+        await _client.PutBucketAsync("source-bucket");
+        await _client.PutBucketAsync("dest-bucket");
+        var content = "Test content for ETag verification";
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "source-bucket",
+            Key = "source-key",
+            ContentBody = content
+        });
+
+        // Act
+        var copyResponse = await _client.CopyObjectAsync(
+            "source-bucket", "source-key",
+            "dest-bucket", "dest-key");
+
+        // Assert
+        var sourceMetadata = await _client.GetObjectMetadataAsync("source-bucket", "source-key");
+        Assert.That(copyResponse.ETag, Is.EqualTo(sourceMetadata.ETag));
     }
 
     #endregion
