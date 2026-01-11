@@ -172,6 +172,51 @@ public class CouchbaseS3Client : IAmazonS3
         }, cancellationToken);
     }
 
+    /// <summary>
+    /// Checks if a bucket exists and returns metadata about the bucket without returning the contents.
+    /// This is equivalent to an HTTP HEAD request for the bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket to check.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the bucket metadata.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<HeadBucketResponse> HeadBucketAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        var request = new HeadBucketRequest { BucketName = bucketName };
+        return await HeadBucketAsync(request, cancellationToken);
+    }
+
+    /// <summary>
+    /// Checks if a bucket exists and returns metadata about the bucket without returning the contents.
+    /// This is equivalent to an HTTP HEAD request for the bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the bucket metadata.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<HeadBucketResponse> HeadBucketAsync(HeadBucketRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDoc = _database.GetDocument($"bucket::{request.BucketName}");
+
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            return new HeadBucketResponse
+            {
+                BucketRegion = "local",
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
+
     #endregion
 
     #region Object Operations
@@ -527,14 +572,99 @@ public class CouchbaseS3Client : IAmazonS3
         throw new NotImplementedException();
     }
 
-    public Task<GetObjectMetadataResponse> GetObjectMetadataAsync(string bucketName, string key, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Retrieves metadata for an object without returning the object itself.
+    /// This is equivalent to an HTTP HEAD request for the object.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket containing the object.</param>
+    /// <param name="key">The key of the object.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the object metadata.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the object does not exist.</exception>
+    public async Task<GetObjectMetadataResponse> GetObjectMetadataAsync(string bucketName, string key, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var request = new GetObjectMetadataRequest
+        {
+            BucketName = bucketName,
+            Key = key
+        };
+        return await GetObjectMetadataAsync(request, cancellationToken);
     }
 
-    public Task<GetObjectMetadataResponse> GetObjectMetadataAsync(GetObjectMetadataRequest request, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Retrieves metadata for an object without returning the object itself.
+    /// This is equivalent to an HTTP HEAD request for the object.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name and object key.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the object metadata.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the object does not exist.</exception>
+    public async Task<GetObjectMetadataResponse> GetObjectMetadataAsync(GetObjectMetadataRequest request, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        return await Task.Run(() =>
+        {
+            Document? doc;
+
+            // If versionId is specified, look for the versioned document
+            if (!string.IsNullOrEmpty(request.VersionId))
+            {
+                var versionDocId = $"version::{request.BucketName}::{request.Key}::{request.VersionId}";
+                doc = _database.GetDocument(versionDocId);
+
+                if (doc == null)
+                {
+                    throw new AmazonS3Exception("The specified version does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchVersion"
+                    };
+                }
+            }
+            else
+            {
+                var objectId = $"object::{request.BucketName}::{request.Key}";
+                doc = _database.GetDocument(objectId);
+
+                if (doc == null)
+                {
+                    throw new AmazonS3Exception("Object does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchKey"
+                    };
+                }
+            }
+
+            var response = new GetObjectMetadataResponse
+            {
+                ContentLength = doc.GetLong("size"),
+                ETag = doc.GetString("etag"),
+                LastModified = doc.GetDate("lastModified").UtcDateTime,
+                HttpStatusCode = HttpStatusCode.OK
+            };
+
+            // Set content type via headers
+            response.Headers.ContentType = doc.GetString("contentType");
+
+            // Add metadata
+            var metadataDict = doc.GetDictionary("metadata");
+            if (metadataDict != null)
+            {
+                foreach (var key in metadataDict.Keys)
+                {
+                    response.Metadata[key] = metadataDict.GetString(key);
+                }
+            }
+
+            // Handle version ID if present
+            var versionId = doc.GetString("versionId") ?? request.VersionId;
+            if (!string.IsNullOrEmpty(versionId))
+            {
+                response.VersionId = versionId;
+            }
+
+            return response;
+        }, cancellationToken);
     }
 
     public Task<ListObjectsResponse> ListObjectsAsync(string bucketName, CancellationToken cancellationToken = default)
@@ -599,9 +729,24 @@ public class CouchbaseS3Client : IAmazonS3
         throw new NotImplementedException();
     }
 
-    public Task<GetObjectMetadataResponse> GetObjectMetadataAsync(string bucketName, string key, string versionId, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Retrieves metadata for a specific version of an object without returning the object itself.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket containing the object.</param>
+    /// <param name="key">The key of the object.</param>
+    /// <param name="versionId">The version ID of the object.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the object metadata.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the object or version does not exist.</exception>
+    public async Task<GetObjectMetadataResponse> GetObjectMetadataAsync(string bucketName, string key, string versionId, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var request = new GetObjectMetadataRequest
+        {
+            BucketName = bucketName,
+            Key = key,
+            VersionId = versionId
+        };
+        return await GetObjectMetadataAsync(request, cancellationToken);
     }
 
     public Task<ListDirectoryBucketsResponse> ListDirectoryBucketsAsync(ListDirectoryBucketsRequest request, CancellationToken cancellationToken = default)
@@ -1038,8 +1183,19 @@ public class CouchbaseS3Client : IAmazonS3
     public Task EnsureBucketExistsAsync(string bucketName)
         => throw new NotImplementedException();
 
-    public Task<bool> DoesS3BucketExistAsync(string bucketName)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Checks if a bucket exists in the Couchbase Lite storage.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket to check.</param>
+    /// <returns>True if the bucket exists, false otherwise.</returns>
+    public async Task<bool> DoesS3BucketExistAsync(string bucketName)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDoc = _database.GetDocument($"bucket::{bucketName}");
+            return bucketDoc != null;
+        });
+    }
 
     #endregion
 }

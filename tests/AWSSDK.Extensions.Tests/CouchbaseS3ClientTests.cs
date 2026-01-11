@@ -406,4 +406,181 @@ public class CouchbaseS3ClientTests
     }
 
     #endregion
+
+    #region Metadata Tests
+
+    [Test]
+    public async Task GetObjectMetadata_ReturnsMetadata_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        var request = new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            ContentBody = "Test content",
+            ContentType = "text/plain"
+        };
+        request.Metadata.Add("custom-header", "custom-value");
+        await _client.PutObjectAsync(request);
+
+        // Act
+        var response = await _client.GetObjectMetadataAsync("test-bucket", "test-key");
+
+        // Assert
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.ContentLength, Is.EqualTo(12)); // "Test content" length
+        Assert.That(response.ETag, Is.Not.Null.And.Not.Empty);
+        Assert.That(response.Headers.ContentType, Is.EqualTo("text/plain"));
+        Assert.That(response.Metadata["custom-header"], Is.EqualTo("custom-value"));
+    }
+
+    [Test]
+    public async Task GetObjectMetadata_WithRequest_ReturnsMetadata_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            ContentBody = "content"
+        });
+
+        var request = new GetObjectMetadataRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key"
+        };
+
+        // Act
+        var response = await _client.GetObjectMetadataAsync(request);
+
+        // Assert
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.ContentLength, Is.EqualTo(7)); // "content" length
+    }
+
+    [Test]
+    public void GetObjectMetadata_NonExistentObject_ThrowsException()
+    {
+        // Arrange
+        _client.PutBucketAsync("test-bucket").Wait();
+
+        // Act & Assert
+        var ex = Assert.ThrowsAsync<Amazon.S3.AmazonS3Exception>(
+            async () => await _client.GetObjectMetadataAsync("test-bucket", "non-existent"));
+
+        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        Assert.That(ex.ErrorCode, Is.EqualTo("NoSuchKey"));
+    }
+
+    [Test]
+    public async Task GetObjectMetadata_ReturnsLastModified_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        var beforePut = DateTime.UtcNow.AddSeconds(-1);
+
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            ContentBody = "content"
+        });
+
+        var afterPut = DateTime.UtcNow.AddSeconds(1);
+
+        // Act
+        var response = await _client.GetObjectMetadataAsync("test-bucket", "test-key");
+
+        // Assert
+        Assert.That(response.LastModified, Is.GreaterThan(beforePut).And.LessThan(afterPut));
+    }
+
+    #endregion
+
+    #region HeadBucket Tests
+
+    [Test]
+    public async Task HeadBucket_ExistingBucket_ReturnsSuccess()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+
+        // Act
+        var response = await _client.HeadBucketAsync("test-bucket");
+
+        // Assert
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.BucketRegion, Is.EqualTo("local"));
+    }
+
+    [Test]
+    public async Task HeadBucket_WithRequest_ExistingBucket_ReturnsSuccess()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        var request = new HeadBucketRequest { BucketName = "test-bucket" };
+
+        // Act
+        var response = await _client.HeadBucketAsync(request);
+
+        // Assert
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public void HeadBucket_NonExistentBucket_ThrowsException()
+    {
+        // Act & Assert
+        var ex = Assert.ThrowsAsync<Amazon.S3.AmazonS3Exception>(
+            async () => await _client.HeadBucketAsync("non-existent-bucket"));
+
+        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        Assert.That(ex.ErrorCode, Is.EqualTo("NoSuchBucket"));
+    }
+
+    #endregion
+
+    #region DoesS3BucketExist Tests
+
+    [Test]
+    public async Task DoesS3BucketExist_ExistingBucket_ReturnsTrue()
+    {
+        // Arrange
+        await _client.PutBucketAsync("existing-bucket");
+
+        // Act
+        var exists = await _client.DoesS3BucketExistAsync("existing-bucket");
+
+        // Assert
+        Assert.That(exists, Is.True);
+    }
+
+    [Test]
+    public async Task DoesS3BucketExist_NonExistentBucket_ReturnsFalse()
+    {
+        // Act
+        var exists = await _client.DoesS3BucketExistAsync("non-existent-bucket");
+
+        // Assert
+        Assert.That(exists, Is.False);
+    }
+
+    [Test]
+    public async Task DoesS3BucketExist_DeletedBucket_ReturnsFalse()
+    {
+        // Arrange
+        await _client.PutBucketAsync("bucket-to-delete");
+        await _client.DeleteBucketAsync("bucket-to-delete");
+
+        // Act
+        var exists = await _client.DoesS3BucketExistAsync("bucket-to-delete");
+
+        // Assert
+        Assert.That(exists, Is.False);
+    }
+
+    #endregion
 }
