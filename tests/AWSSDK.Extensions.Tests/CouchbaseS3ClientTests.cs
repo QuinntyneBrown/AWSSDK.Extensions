@@ -2388,4 +2388,316 @@ public class CouchbaseS3ClientTests
     }
 
     #endregion
+
+    #region Object Tagging and Protection Tests
+
+    [Test]
+    public async Task PutObjectTagging_SetsTagsSuccessfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes("test content"));
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            InputStream = stream
+        });
+
+        // Act
+        var response = await _client.PutObjectTaggingAsync(new PutObjectTaggingRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            Tagging = new Tagging
+            {
+                TagSet = new List<Tag>
+                {
+                    new Tag { Key = "Environment", Value = "Production" },
+                    new Tag { Key = "Project", Value = "Test" }
+                }
+            }
+        });
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GetObjectTagging_ReturnsTags()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes("test content"));
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            InputStream = stream
+        });
+        await _client.PutObjectTaggingAsync(new PutObjectTaggingRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            Tagging = new Tagging
+            {
+                TagSet = new List<Tag>
+                {
+                    new Tag { Key = "Team", Value = "DevOps" }
+                }
+            }
+        });
+
+        // Act
+        var response = await _client.GetObjectTaggingAsync(new GetObjectTaggingRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key"
+        });
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.Tagging.TagSet.Count, Is.EqualTo(1));
+        Assert.That(response.Tagging.TagSet[0].Key, Is.EqualTo("Team"));
+        Assert.That(response.Tagging.TagSet[0].Value, Is.EqualTo("DevOps"));
+    }
+
+    [Test]
+    public async Task DeleteObjectTagging_RemovesTags()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes("test content"));
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            InputStream = stream
+        });
+        await _client.PutObjectTaggingAsync(new PutObjectTaggingRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            Tagging = new Tagging
+            {
+                TagSet = new List<Tag> { new Tag { Key = "Test", Value = "Value" } }
+            }
+        });
+
+        // Act
+        var response = await _client.DeleteObjectTaggingAsync(new DeleteObjectTaggingRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key"
+        });
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+
+        // Verify tags are deleted
+        var tagsResponse = await _client.GetObjectTaggingAsync(new GetObjectTaggingRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key"
+        });
+        Assert.That(tagsResponse.Tagging.TagSet, Is.Empty);
+    }
+
+    [Test]
+    public async Task PutObjectLegalHold_SetsLegalHold()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes("test content"));
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            InputStream = stream
+        });
+
+        // Act
+        var response = await _client.PutObjectLegalHoldAsync(new PutObjectLegalHoldRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            LegalHold = new ObjectLockLegalHold
+            {
+                Status = ObjectLockLegalHoldStatus.On
+            }
+        });
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GetObjectLegalHold_ReturnsLegalHold()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes("test content"));
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            InputStream = stream
+        });
+        await _client.PutObjectLegalHoldAsync(new PutObjectLegalHoldRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            LegalHold = new ObjectLockLegalHold { Status = ObjectLockLegalHoldStatus.On }
+        });
+
+        // Act
+        var response = await _client.GetObjectLegalHoldAsync(new GetObjectLegalHoldRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key"
+        });
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.LegalHold.Status.Value, Is.EqualTo("ON"));
+    }
+
+    [Test]
+    public async Task PutObjectLockConfiguration_SetsConfiguration()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+
+        // Act
+        var response = await _client.PutObjectLockConfigurationAsync(new PutObjectLockConfigurationRequest
+        {
+            BucketName = "test-bucket",
+            ObjectLockConfiguration = new ObjectLockConfiguration
+            {
+                ObjectLockEnabled = ObjectLockEnabled.Enabled,
+                Rule = new ObjectLockRule
+                {
+                    DefaultRetention = new DefaultRetention
+                    {
+                        Mode = ObjectLockRetentionMode.Governance,
+                        Days = 30
+                    }
+                }
+            }
+        });
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GetObjectLockConfiguration_ReturnsConfiguration()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutObjectLockConfigurationAsync(new PutObjectLockConfigurationRequest
+        {
+            BucketName = "test-bucket",
+            ObjectLockConfiguration = new ObjectLockConfiguration
+            {
+                ObjectLockEnabled = ObjectLockEnabled.Enabled,
+                Rule = new ObjectLockRule
+                {
+                    DefaultRetention = new DefaultRetention
+                    {
+                        Mode = ObjectLockRetentionMode.Governance,
+                        Days = 7
+                    }
+                }
+            }
+        });
+
+        // Act
+        var response = await _client.GetObjectLockConfigurationAsync(new GetObjectLockConfigurationRequest
+        {
+            BucketName = "test-bucket"
+        });
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.ObjectLockConfiguration, Is.Not.Null);
+        Assert.That(response.ObjectLockConfiguration.Rule.DefaultRetention.Days, Is.EqualTo(7));
+    }
+
+    [Test]
+    public async Task PutObjectRetention_SetsRetention()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes("test content"));
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            InputStream = stream
+        });
+
+        // Act
+        var response = await _client.PutObjectRetentionAsync(new PutObjectRetentionRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            Retention = new ObjectLockRetention
+            {
+                Mode = ObjectLockRetentionMode.Governance,
+                RetainUntilDate = DateTime.UtcNow.AddDays(30)
+            }
+        });
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GetObjectRetention_ReturnsRetention()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes("test content"));
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            InputStream = stream
+        });
+        var retainUntil = DateTime.UtcNow.AddDays(30);
+        await _client.PutObjectRetentionAsync(new PutObjectRetentionRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            Retention = new ObjectLockRetention
+            {
+                Mode = ObjectLockRetentionMode.Compliance,
+                RetainUntilDate = retainUntil
+            }
+        });
+
+        // Act
+        var response = await _client.GetObjectRetentionAsync(new GetObjectRetentionRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key"
+        });
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.Retention, Is.Not.Null);
+        Assert.That(response.Retention.Mode.Value, Is.EqualTo("COMPLIANCE"));
+    }
+
+    #endregion
 }

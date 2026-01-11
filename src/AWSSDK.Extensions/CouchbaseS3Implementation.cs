@@ -1975,8 +1975,40 @@ public class CouchbaseS3Client : IAmazonS3
         }, cancellationToken);
     }
 
-    public Task<DeleteObjectTaggingResponse> DeleteObjectTaggingAsync(DeleteObjectTaggingRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Deletes all tags from the specified object.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name and object key.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the delete operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the object does not exist.</exception>
+    public async Task<DeleteObjectTaggingResponse> DeleteObjectTaggingAsync(DeleteObjectTaggingRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var objectDocId = $"object::{request.BucketName}::{request.Key}";
+            var objectDoc = _database.GetDocument(objectDocId);
+            if (objectDoc == null)
+            {
+                throw new AmazonS3Exception("Object does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchKey"
+                };
+            }
+
+            using (var mutableDoc = objectDoc.ToMutable())
+            {
+                mutableDoc.Remove("tags");
+                _database.Save(mutableDoc);
+            }
+
+            return new DeleteObjectTaggingResponse
+            {
+                HttpStatusCode = HttpStatusCode.NoContent
+            };
+        }, cancellationToken);
+    }
 
     /// <summary>
     /// Deletes the public access block configuration for the specified bucket.
@@ -2759,17 +2791,191 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<GetObjectAttributesResponse> GetObjectAttributesAsync(GetObjectAttributesRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<GetObjectLegalHoldResponse> GetObjectLegalHoldAsync(GetObjectLegalHoldRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Gets the legal hold status for the specified object.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name and object key.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the legal hold status.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the object does not exist.</exception>
+    public async Task<GetObjectLegalHoldResponse> GetObjectLegalHoldAsync(GetObjectLegalHoldRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var objectDocId = $"object::{request.BucketName}::{request.Key}";
+            var objectDoc = _database.GetDocument(objectDocId);
+            if (objectDoc == null)
+            {
+                throw new AmazonS3Exception("Object does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchKey"
+                };
+            }
 
-    public Task<GetObjectLockConfigurationResponse> GetObjectLockConfigurationAsync(GetObjectLockConfigurationRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            var legalHoldStatus = objectDoc.GetString("legalHoldStatus") ?? "OFF";
 
-    public Task<GetObjectRetentionResponse> GetObjectRetentionAsync(GetObjectRetentionRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            return new GetObjectLegalHoldResponse
+            {
+                LegalHold = new ObjectLockLegalHold
+                {
+                    Status = new ObjectLockLegalHoldStatus(legalHoldStatus)
+                },
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
-    public Task<GetObjectTaggingResponse> GetObjectTaggingAsync(GetObjectTaggingRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Gets the Object Lock configuration for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the Object Lock configuration.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist or has no lock configuration.</exception>
+    public async Task<GetObjectLockConfigurationResponse> GetObjectLockConfigurationAsync(GetObjectLockConfigurationRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDoc = _database.GetDocument($"bucket::{request.BucketName}");
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            var lockDict = bucketDoc.GetDictionary("objectLockConfiguration");
+            if (lockDict == null)
+            {
+                throw new AmazonS3Exception("Object Lock configuration does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "ObjectLockConfigurationNotFoundError"
+                };
+            }
+
+            var config = new ObjectLockConfiguration
+            {
+                ObjectLockEnabled = new ObjectLockEnabled(lockDict.GetString("enabled") ?? "Enabled")
+            };
+
+            var ruleDict = lockDict.GetDictionary("rule");
+            if (ruleDict != null)
+            {
+                config.Rule = new ObjectLockRule
+                {
+                    DefaultRetention = new DefaultRetention
+                    {
+                        Mode = new ObjectLockRetentionMode(ruleDict.GetString("mode") ?? "GOVERNANCE"),
+                        Days = (int)ruleDict.GetLong("days"),
+                        Years = (int)ruleDict.GetLong("years")
+                    }
+                };
+            }
+
+            return new GetObjectLockConfigurationResponse
+            {
+                ObjectLockConfiguration = config,
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Gets the retention settings for the specified object.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name and object key.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the retention settings.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the object does not exist.</exception>
+    public async Task<GetObjectRetentionResponse> GetObjectRetentionAsync(GetObjectRetentionRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var objectDocId = $"object::{request.BucketName}::{request.Key}";
+            var objectDoc = _database.GetDocument(objectDocId);
+            if (objectDoc == null)
+            {
+                throw new AmazonS3Exception("Object does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchKey"
+                };
+            }
+
+            var retentionDict = objectDoc.GetDictionary("retention");
+            if (retentionDict == null)
+            {
+                return new GetObjectRetentionResponse
+                {
+                    Retention = null,
+                    HttpStatusCode = HttpStatusCode.OK
+                };
+            }
+
+            var retainUntilDate = retentionDict.GetString("retainUntilDate");
+
+            return new GetObjectRetentionResponse
+            {
+                Retention = new ObjectLockRetention
+                {
+                    Mode = new ObjectLockRetentionMode(retentionDict.GetString("mode") ?? "GOVERNANCE"),
+                    RetainUntilDate = string.IsNullOrEmpty(retainUntilDate) ? DateTime.MinValue : DateTime.Parse(retainUntilDate)
+                },
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Gets the tags for the specified object.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name and object key.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the object's tags.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the object does not exist.</exception>
+    public async Task<GetObjectTaggingResponse> GetObjectTaggingAsync(GetObjectTaggingRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var objectDocId = $"object::{request.BucketName}::{request.Key}";
+            var objectDoc = _database.GetDocument(objectDocId);
+            if (objectDoc == null)
+            {
+                throw new AmazonS3Exception("Object does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchKey"
+                };
+            }
+
+            var tags = new List<Tag>();
+            var tagsArray = objectDoc.GetArray("tags");
+            if (tagsArray != null)
+            {
+                foreach (var tagItem in tagsArray)
+                {
+                    if (tagItem is DictionaryObject tagDict)
+                    {
+                        tags.Add(new Tag
+                        {
+                            Key = tagDict.GetString("key") ?? string.Empty,
+                            Value = tagDict.GetString("value") ?? string.Empty
+                        });
+                    }
+                }
+            }
+
+            return new GetObjectTaggingResponse
+            {
+                Tagging = new Tagging { TagSet = tags },
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<GetObjectTorrentResponse> GetObjectTorrentAsync(string bucketName, string key, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
@@ -3980,17 +4186,181 @@ public class CouchbaseS3Client : IAmazonS3
         }, cancellationToken);
     }
 
-    public Task<PutObjectLegalHoldResponse> PutObjectLegalHoldAsync(PutObjectLegalHoldRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Sets the legal hold status for the specified object.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name, object key, and legal hold status.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the put operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the object does not exist.</exception>
+    public async Task<PutObjectLegalHoldResponse> PutObjectLegalHoldAsync(PutObjectLegalHoldRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var objectDocId = $"object::{request.BucketName}::{request.Key}";
+            var objectDoc = _database.GetDocument(objectDocId);
+            if (objectDoc == null)
+            {
+                throw new AmazonS3Exception("Object does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchKey"
+                };
+            }
 
-    public Task<PutObjectLockConfigurationResponse> PutObjectLockConfigurationAsync(PutObjectLockConfigurationRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            using (var mutableDoc = objectDoc.ToMutable())
+            {
+                mutableDoc.SetString("legalHoldStatus", request.LegalHold?.Status?.Value ?? "OFF");
+                _database.Save(mutableDoc);
+            }
 
-    public Task<PutObjectRetentionResponse> PutObjectRetentionAsync(PutObjectRetentionRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            return new PutObjectLegalHoldResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
-    public Task<PutObjectTaggingResponse> PutObjectTaggingAsync(PutObjectTaggingRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Sets the Object Lock configuration for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name and lock configuration.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the put operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<PutObjectLockConfigurationResponse> PutObjectLockConfigurationAsync(PutObjectLockConfigurationRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDocId = $"bucket::{request.BucketName}";
+            var bucketDoc = _database.GetDocument(bucketDocId);
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            using (var mutableDoc = bucketDoc.ToMutable())
+            {
+                var lockDict = new MutableDictionaryObject();
+                lockDict.SetString("enabled", request.ObjectLockConfiguration?.ObjectLockEnabled?.Value ?? "Enabled");
+
+                if (request.ObjectLockConfiguration?.Rule?.DefaultRetention != null)
+                {
+                    var ruleDict = new MutableDictionaryObject();
+                    ruleDict.SetString("mode", request.ObjectLockConfiguration.Rule.DefaultRetention.Mode?.Value);
+                    ruleDict.SetLong("days", request.ObjectLockConfiguration.Rule.DefaultRetention.Days);
+                    ruleDict.SetLong("years", request.ObjectLockConfiguration.Rule.DefaultRetention.Years);
+                    lockDict.SetDictionary("rule", ruleDict);
+                }
+
+                mutableDoc.SetDictionary("objectLockConfiguration", lockDict);
+                _database.Save(mutableDoc);
+            }
+
+            return new PutObjectLockConfigurationResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Sets the retention settings for the specified object.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name, object key, and retention settings.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the put operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the object does not exist.</exception>
+    public async Task<PutObjectRetentionResponse> PutObjectRetentionAsync(PutObjectRetentionRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var objectDocId = $"object::{request.BucketName}::{request.Key}";
+            var objectDoc = _database.GetDocument(objectDocId);
+            if (objectDoc == null)
+            {
+                throw new AmazonS3Exception("Object does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchKey"
+                };
+            }
+
+            using (var mutableDoc = objectDoc.ToMutable())
+            {
+                if (request.Retention != null)
+                {
+                    var retentionDict = new MutableDictionaryObject();
+                    retentionDict.SetString("mode", request.Retention.Mode?.Value);
+                    if (request.Retention.RetainUntilDate != DateTime.MinValue)
+                    {
+                        retentionDict.SetString("retainUntilDate", request.Retention.RetainUntilDate.ToString("o"));
+                    }
+                    mutableDoc.SetDictionary("retention", retentionDict);
+                }
+                else
+                {
+                    mutableDoc.Remove("retention");
+                }
+                _database.Save(mutableDoc);
+            }
+
+            return new PutObjectRetentionResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Sets the tags for the specified object.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name, object key, and tags.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the put operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the object does not exist.</exception>
+    public async Task<PutObjectTaggingResponse> PutObjectTaggingAsync(PutObjectTaggingRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var objectDocId = $"object::{request.BucketName}::{request.Key}";
+            var objectDoc = _database.GetDocument(objectDocId);
+            if (objectDoc == null)
+            {
+                throw new AmazonS3Exception("Object does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchKey"
+                };
+            }
+
+            using (var mutableDoc = objectDoc.ToMutable())
+            {
+                var tagsArray = new MutableArrayObject();
+                if (request.Tagging?.TagSet != null)
+                {
+                    foreach (var tag in request.Tagging.TagSet)
+                    {
+                        var tagDict = new MutableDictionaryObject();
+                        tagDict.SetString("key", tag.Key);
+                        tagDict.SetString("value", tag.Value);
+                        tagsArray.AddDictionary(tagDict);
+                    }
+                }
+                mutableDoc.SetArray("tags", tagsArray);
+                _database.Save(mutableDoc);
+            }
+
+            return new PutObjectTaggingResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     /// <summary>
     /// Sets the public access block configuration for the specified bucket.
