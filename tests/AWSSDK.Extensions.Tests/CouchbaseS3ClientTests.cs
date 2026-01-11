@@ -1042,4 +1042,264 @@ public class CouchbaseS3ClientTests
     }
 
     #endregion
+
+    #region ListObjects (V1 API) Tests
+
+    [Test]
+    public async Task ListObjects_ReturnsObjects_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "key1",
+            ContentBody = "content1"
+        });
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "key2",
+            ContentBody = "content2"
+        });
+
+        // Act
+        var response = await _client.ListObjectsAsync("test-bucket");
+
+        // Assert
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.S3Objects, Has.Count.EqualTo(2));
+        Assert.That(response.Name, Is.EqualTo("test-bucket"));
+    }
+
+    [Test]
+    public async Task ListObjects_WithPrefix_FiltersObjects()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "dir1/file1.txt",
+            ContentBody = "content1"
+        });
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "dir2/file2.txt",
+            ContentBody = "content2"
+        });
+
+        // Act
+        var response = await _client.ListObjectsAsync("test-bucket", "dir1/");
+
+        // Assert
+        Assert.That(response.S3Objects, Has.Count.EqualTo(1));
+        Assert.That(response.S3Objects[0].Key, Is.EqualTo("dir1/file1.txt"));
+        Assert.That(response.Prefix, Is.EqualTo("dir1/"));
+    }
+
+    [Test]
+    public async Task ListObjects_WithRequest_ReturnsObjects()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "test-key",
+            ContentBody = "content"
+        });
+
+        var request = new ListObjectsRequest
+        {
+            BucketName = "test-bucket"
+        };
+
+        // Act
+        var response = await _client.ListObjectsAsync(request);
+
+        // Assert
+        Assert.That(response.S3Objects, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public async Task ListObjects_WithMarkerPagination_ReturnsCorrectObjects()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        for (int i = 1; i <= 5; i++)
+        {
+            await _client.PutObjectAsync(new PutObjectRequest
+            {
+                BucketName = "test-bucket",
+                Key = $"key{i:D2}",
+                ContentBody = $"content{i}"
+            });
+        }
+
+        // Act - Get first page with 2 items
+        var request1 = new ListObjectsRequest
+        {
+            BucketName = "test-bucket",
+            MaxKeys = 2
+        };
+        var response1 = await _client.ListObjectsAsync(request1);
+
+        // Assert first page
+        Assert.That(response1.S3Objects, Has.Count.EqualTo(2));
+        Assert.That(response1.IsTruncated, Is.True);
+        Assert.That(response1.NextMarker, Is.Not.Null);
+
+        // Act - Get second page using marker
+        var request2 = new ListObjectsRequest
+        {
+            BucketName = "test-bucket",
+            MaxKeys = 2,
+            Marker = response1.NextMarker
+        };
+        var response2 = await _client.ListObjectsAsync(request2);
+
+        // Assert second page
+        Assert.That(response2.S3Objects, Has.Count.EqualTo(2));
+        Assert.That(response2.Marker, Is.EqualTo(response1.NextMarker));
+    }
+
+    [Test]
+    public async Task ListObjects_WithDelimiter_ReturnsCommonPrefixes()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "photos/2023/image1.jpg",
+            ContentBody = "image1"
+        });
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "photos/2024/image2.jpg",
+            ContentBody = "image2"
+        });
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "documents/file.txt",
+            ContentBody = "file"
+        });
+
+        var request = new ListObjectsRequest
+        {
+            BucketName = "test-bucket",
+            Delimiter = "/"
+        };
+
+        // Act
+        var response = await _client.ListObjectsAsync(request);
+
+        // Assert
+        Assert.That(response.CommonPrefixes, Has.Count.EqualTo(2));
+        Assert.That(response.CommonPrefixes.Select(p => p.Prefix),
+            Is.EquivalentTo(new[] { "photos/", "documents/" }));
+        Assert.That(response.S3Objects, Is.Empty); // All objects are grouped under prefixes
+    }
+
+    [Test]
+    public async Task ListObjects_WithPrefixAndDelimiter_ReturnsSubdirectories()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "photos/2023/jan/image1.jpg",
+            ContentBody = "image1"
+        });
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "photos/2023/feb/image2.jpg",
+            ContentBody = "image2"
+        });
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = "test-bucket",
+            Key = "photos/readme.txt",
+            ContentBody = "readme"
+        });
+
+        var request = new ListObjectsRequest
+        {
+            BucketName = "test-bucket",
+            Prefix = "photos/",
+            Delimiter = "/"
+        };
+
+        // Act
+        var response = await _client.ListObjectsAsync(request);
+
+        // Assert
+        Assert.That(response.CommonPrefixes, Has.Count.EqualTo(1));
+        Assert.That(response.CommonPrefixes[0].Prefix, Is.EqualTo("photos/2023/"));
+        Assert.That(response.S3Objects, Has.Count.EqualTo(1));
+        Assert.That(response.S3Objects[0].Key, Is.EqualTo("photos/readme.txt"));
+    }
+
+    [Test]
+    public void ListObjects_BucketNotExists_ThrowsException()
+    {
+        // Act & Assert
+        var ex = Assert.ThrowsAsync<Amazon.S3.AmazonS3Exception>(
+            async () => await _client.ListObjectsAsync("non-existent-bucket"));
+
+        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        Assert.That(ex.ErrorCode, Is.EqualTo("NoSuchBucket"));
+    }
+
+    [Test]
+    public async Task ListObjects_EmptyBucket_ReturnsEmptyList()
+    {
+        // Arrange
+        await _client.PutBucketAsync("empty-bucket");
+
+        // Act
+        var response = await _client.ListObjectsAsync("empty-bucket");
+
+        // Assert
+        Assert.That(response.S3Objects, Is.Empty);
+        Assert.That(response.IsTruncated, Is.False);
+    }
+
+    [Test]
+    public async Task ListObjects_MaxKeys_LimitsResults()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        for (int i = 0; i < 10; i++)
+        {
+            await _client.PutObjectAsync(new PutObjectRequest
+            {
+                BucketName = "test-bucket",
+                Key = $"key{i}",
+                ContentBody = "content"
+            });
+        }
+
+        var request = new ListObjectsRequest
+        {
+            BucketName = "test-bucket",
+            MaxKeys = 3
+        };
+
+        // Act
+        var response = await _client.ListObjectsAsync(request);
+
+        // Assert
+        Assert.That(response.S3Objects, Has.Count.EqualTo(3));
+        Assert.That(response.MaxKeys, Is.EqualTo(3));
+        Assert.That(response.IsTruncated, Is.True);
+    }
+
+    #endregion
 }

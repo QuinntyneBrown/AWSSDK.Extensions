@@ -830,19 +830,143 @@ public class CouchbaseS3Client : IAmazonS3
         }, cancellationToken);
     }
 
-    public Task<ListObjectsResponse> ListObjectsAsync(string bucketName, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Lists objects in a bucket using the legacy V1 API.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket to list.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the list of objects.</returns>
+    public async Task<ListObjectsResponse> ListObjectsAsync(string bucketName, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var request = new ListObjectsRequest { BucketName = bucketName };
+        return await ListObjectsAsync(request, cancellationToken);
     }
 
-    public Task<ListObjectsResponse> ListObjectsAsync(string bucketName, string prefix, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Lists objects in a bucket with a prefix filter using the legacy V1 API.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket to list.</param>
+    /// <param name="prefix">The prefix to filter objects by.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the filtered list of objects.</returns>
+    public async Task<ListObjectsResponse> ListObjectsAsync(string bucketName, string prefix, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var request = new ListObjectsRequest
+        {
+            BucketName = bucketName,
+            Prefix = prefix
+        };
+        return await ListObjectsAsync(request, cancellationToken);
     }
 
-    public Task<ListObjectsResponse> ListObjectsAsync(ListObjectsRequest request, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Lists objects in a bucket using the legacy V1 API with marker-based pagination.
+    /// </summary>
+    /// <param name="request">The request containing bucket name, prefix, marker, and other parameters.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the list of objects with pagination information.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<ListObjectsResponse> ListObjectsAsync(ListObjectsRequest request, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        return await Task.Run(() =>
+        {
+            // Verify bucket exists
+            var bucketDoc = _database.GetDocument($"bucket::{request.BucketName}");
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            var query = QueryBuilder.Select(SelectResult.All())
+                .From(DataSource.Database(_database))
+                .Where(
+                    Expression.Property("type").EqualTo(Expression.String("object"))
+                    .And(Expression.Property("bucketName").EqualTo(Expression.String(request.BucketName)))
+                );
+
+            var objects = new List<S3Object>();
+            var commonPrefixes = new HashSet<string>();
+
+            foreach (var result in query.Execute())
+            {
+                var dict = result.GetDictionary(0);
+                var key = dict.GetString("key");
+
+                // Apply prefix filter
+                if (!string.IsNullOrEmpty(request.Prefix) && !key.StartsWith(request.Prefix))
+                {
+                    continue;
+                }
+
+                // Apply marker filter (V1 pagination - marker is the last key from previous page)
+                if (!string.IsNullOrEmpty(request.Marker) &&
+                    string.CompareOrdinal(key, request.Marker) <= 0)
+                {
+                    continue;
+                }
+
+                // Handle delimiter for directory-like listing
+                if (!string.IsNullOrEmpty(request.Delimiter))
+                {
+                    var prefixLength = request.Prefix?.Length ?? 0;
+                    var delimiterIndex = key.IndexOf(request.Delimiter, prefixLength);
+
+                    if (delimiterIndex >= 0)
+                    {
+                        var commonPrefix = key.Substring(0, delimiterIndex + request.Delimiter.Length);
+                        commonPrefixes.Add(commonPrefix);
+                        continue;
+                    }
+                }
+
+                var lastModified = dict.GetDate("lastModified");
+                objects.Add(new S3Object
+                {
+                    Key = key,
+                    Size = dict.GetLong("size"),
+                    LastModified = lastModified.UtcDateTime,
+                    ETag = dict.GetString("etag"),
+                    StorageClass = S3StorageClass.Standard
+                });
+            }
+
+            // Sort by key
+            objects = objects.OrderBy(o => o.Key).ToList();
+
+            // Apply max keys
+            var maxKeys = request.MaxKeys > 0 ? request.MaxKeys : 1000;
+            var isTruncated = objects.Count > maxKeys;
+
+            if (isTruncated)
+            {
+                objects = objects.Take(maxKeys).ToList();
+            }
+
+            var response = new ListObjectsResponse
+            {
+                Name = request.BucketName,
+                Prefix = request.Prefix,
+                Marker = request.Marker,
+                Delimiter = request.Delimiter,
+                MaxKeys = maxKeys,
+                IsTruncated = isTruncated,
+                S3Objects = objects,
+                CommonPrefixes = commonPrefixes.OrderBy(p => p).Select(p => new CommonPrefix { Prefix = p }).ToList(),
+                HttpStatusCode = HttpStatusCode.OK
+            };
+
+            // Set NextMarker for pagination (the key of the last object returned)
+            if (isTruncated && objects.Any())
+            {
+                response.NextMarker = objects.Last().Key;
+            }
+
+            return response;
+        }, cancellationToken);
     }
 
     public Task<ListVersionsResponse> ListVersionsAsync(string bucketName, CancellationToken cancellationToken = default)
