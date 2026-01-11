@@ -1730,8 +1730,40 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<DeleteBucketAnalyticsConfigurationResponse> DeleteBucketAnalyticsConfigurationAsync(DeleteBucketAnalyticsConfigurationRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<DeleteBucketEncryptionResponse> DeleteBucketEncryptionAsync(DeleteBucketEncryptionRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Deletes the encryption configuration from the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the delete operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<DeleteBucketEncryptionResponse> DeleteBucketEncryptionAsync(DeleteBucketEncryptionRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDocId = $"bucket::{request.BucketName}";
+            var bucketDoc = _database.GetDocument(bucketDocId);
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            using (var mutableDoc = bucketDoc.ToMutable())
+            {
+                mutableDoc.Remove("encryption");
+                _database.Save(mutableDoc);
+            }
+
+            return new DeleteBucketEncryptionResponse
+            {
+                HttpStatusCode = HttpStatusCode.NoContent
+            };
+        }, cancellationToken);
+    }
 
     public Task<DeleteBucketIntelligentTieringConfigurationResponse> DeleteBucketIntelligentTieringConfigurationAsync(DeleteBucketIntelligentTieringConfigurationRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
@@ -1802,23 +1834,146 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<DeleteBucketTaggingResponse> DeleteBucketTaggingAsync(DeleteBucketTaggingRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<DeleteBucketWebsiteResponse> DeleteBucketWebsiteAsync(string bucketName, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Deletes the website configuration from the specified bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the delete operation.</returns>
+    public async Task<DeleteBucketWebsiteResponse> DeleteBucketWebsiteAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        var request = new DeleteBucketWebsiteRequest { BucketName = bucketName };
+        return await DeleteBucketWebsiteAsync(request, cancellationToken);
+    }
 
-    public Task<DeleteBucketWebsiteResponse> DeleteBucketWebsiteAsync(DeleteBucketWebsiteRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Deletes the website configuration from the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the delete operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<DeleteBucketWebsiteResponse> DeleteBucketWebsiteAsync(DeleteBucketWebsiteRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDocId = $"bucket::{request.BucketName}";
+            var bucketDoc = _database.GetDocument(bucketDocId);
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
 
-    public Task<DeleteCORSConfigurationResponse> DeleteCORSConfigurationAsync(string bucketName, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            using (var mutableDoc = bucketDoc.ToMutable())
+            {
+                mutableDoc.Remove("websiteConfiguration");
+                _database.Save(mutableDoc);
+            }
 
-    public Task<DeleteCORSConfigurationResponse> DeleteCORSConfigurationAsync(DeleteCORSConfigurationRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            return new DeleteBucketWebsiteResponse
+            {
+                HttpStatusCode = HttpStatusCode.NoContent
+            };
+        }, cancellationToken);
+    }
 
-    public Task<DeleteLifecycleConfigurationResponse> DeleteLifecycleConfigurationAsync(string bucketName, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Deletes the CORS configuration from the specified bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the delete operation.</returns>
+    public async Task<DeleteCORSConfigurationResponse> DeleteCORSConfigurationAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        var request = new DeleteCORSConfigurationRequest { BucketName = bucketName };
+        return await DeleteCORSConfigurationAsync(request, cancellationToken);
+    }
 
-    public Task<DeleteLifecycleConfigurationResponse> DeleteLifecycleConfigurationAsync(DeleteLifecycleConfigurationRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Deletes the CORS configuration from the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the delete operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<DeleteCORSConfigurationResponse> DeleteCORSConfigurationAsync(DeleteCORSConfigurationRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDocId = $"bucket::{request.BucketName}";
+            var bucketDoc = _database.GetDocument(bucketDocId);
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            using (var mutableDoc = bucketDoc.ToMutable())
+            {
+                mutableDoc.Remove("corsConfiguration");
+                _database.Save(mutableDoc);
+            }
+
+            return new DeleteCORSConfigurationResponse
+            {
+                HttpStatusCode = HttpStatusCode.NoContent
+            };
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Deletes the lifecycle configuration from the specified bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the delete operation.</returns>
+    public async Task<DeleteLifecycleConfigurationResponse> DeleteLifecycleConfigurationAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        var request = new DeleteLifecycleConfigurationRequest { BucketName = bucketName };
+        return await DeleteLifecycleConfigurationAsync(request, cancellationToken);
+    }
+
+    /// <summary>
+    /// Deletes the lifecycle configuration from the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the delete operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<DeleteLifecycleConfigurationResponse> DeleteLifecycleConfigurationAsync(DeleteLifecycleConfigurationRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDocId = $"bucket::{request.BucketName}";
+            var bucketDoc = _database.GetDocument(bucketDocId);
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            using (var mutableDoc = bucketDoc.ToMutable())
+            {
+                mutableDoc.Remove("lifecycleConfiguration");
+                _database.Save(mutableDoc);
+            }
+
+            return new DeleteLifecycleConfigurationResponse
+            {
+                HttpStatusCode = HttpStatusCode.NoContent
+            };
+        }, cancellationToken);
+    }
 
     public Task<DeleteObjectTaggingResponse> DeleteObjectTaggingAsync(DeleteObjectTaggingRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
@@ -1969,8 +2124,70 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<GetBucketAnalyticsConfigurationResponse> GetBucketAnalyticsConfigurationAsync(GetBucketAnalyticsConfigurationRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<GetBucketEncryptionResponse> GetBucketEncryptionAsync(GetBucketEncryptionRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Gets the encryption configuration for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the encryption configuration.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist or has no encryption configuration.</exception>
+    public async Task<GetBucketEncryptionResponse> GetBucketEncryptionAsync(GetBucketEncryptionRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDoc = _database.GetDocument($"bucket::{request.BucketName}");
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            var encryptionDict = bucketDoc.GetDictionary("encryption");
+            if (encryptionDict == null)
+            {
+                throw new AmazonS3Exception("The server side encryption configuration was not found")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "ServerSideEncryptionConfigurationNotFoundError"
+                };
+            }
+
+            var rules = new List<ServerSideEncryptionRule>();
+            var rulesArray = encryptionDict.GetArray("rules");
+            if (rulesArray != null)
+            {
+                foreach (var ruleItem in rulesArray)
+                {
+                    if (ruleItem is DictionaryObject ruleDict)
+                    {
+                        var rule = new ServerSideEncryptionRule
+                        {
+                            ServerSideEncryptionByDefault = new ServerSideEncryptionByDefault
+                            {
+                                ServerSideEncryptionAlgorithm = new ServerSideEncryptionMethod(
+                                    ruleDict.GetString("sseAlgorithm") ?? "AES256"),
+                                KMSMasterKeyID = ruleDict.GetString("kmsMasterKeyId")
+                            },
+                            BucketKeyEnabled = ruleDict.GetBoolean("bucketKeyEnabled")
+                        };
+                        rules.Add(rule);
+                    }
+                }
+            }
+
+            return new GetBucketEncryptionResponse
+            {
+                ServerSideEncryptionConfiguration = new ServerSideEncryptionConfiguration
+                {
+                    ServerSideEncryptionRules = rules
+                },
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<GetBucketIntelligentTieringConfigurationResponse> GetBucketIntelligentTieringConfigurationAsync(GetBucketIntelligentTieringConfigurationRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
@@ -1984,20 +2201,103 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<GetBucketLocationResponse> GetBucketLocationAsync(GetBucketLocationRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<GetBucketLoggingResponse> GetBucketLoggingAsync(string bucketName, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Gets the logging configuration for the specified bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the logging configuration.</returns>
+    public async Task<GetBucketLoggingResponse> GetBucketLoggingAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        var request = new GetBucketLoggingRequest { BucketName = bucketName };
+        return await GetBucketLoggingAsync(request, cancellationToken);
+    }
 
-    public Task<GetBucketLoggingResponse> GetBucketLoggingAsync(GetBucketLoggingRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Gets the logging configuration for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the logging configuration.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<GetBucketLoggingResponse> GetBucketLoggingAsync(GetBucketLoggingRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDoc = _database.GetDocument($"bucket::{request.BucketName}");
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            var loggingDict = bucketDoc.GetDictionary("loggingConfiguration");
+            var config = new S3BucketLoggingConfig();
+
+            if (loggingDict != null)
+            {
+                config.TargetBucketName = loggingDict.GetString("targetBucket");
+                config.TargetPrefix = loggingDict.GetString("targetPrefix");
+            }
+
+            return new GetBucketLoggingResponse
+            {
+                BucketLoggingConfig = config,
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<GetBucketMetricsConfigurationResponse> GetBucketMetricsConfigurationAsync(GetBucketMetricsConfigurationRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<GetBucketNotificationResponse> GetBucketNotificationAsync(string bucketName, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Gets the notification configuration for the specified bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the notification configuration.</returns>
+    public async Task<GetBucketNotificationResponse> GetBucketNotificationAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        var request = new GetBucketNotificationRequest { BucketName = bucketName };
+        return await GetBucketNotificationAsync(request, cancellationToken);
+    }
 
-    public Task<GetBucketNotificationResponse> GetBucketNotificationAsync(GetBucketNotificationRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Gets the notification configuration for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the notification configuration.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<GetBucketNotificationResponse> GetBucketNotificationAsync(GetBucketNotificationRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDoc = _database.GetDocument($"bucket::{request.BucketName}");
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            // Return empty notification configuration if none set
+            // In real AWS S3, this returns an empty configuration, not an error
+            return new GetBucketNotificationResponse
+            {
+                TopicConfigurations = new List<TopicConfiguration>(),
+                QueueConfigurations = new List<QueueConfiguration>(),
+                LambdaFunctionConfigurations = new List<LambdaFunctionConfiguration>(),
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<GetBucketOwnershipControlsResponse> GetBucketOwnershipControlsAsync(GetBucketOwnershipControlsRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
@@ -2121,23 +2421,337 @@ public class CouchbaseS3Client : IAmazonS3
         }, cancellationToken);
     }
 
-    public Task<GetBucketWebsiteResponse> GetBucketWebsiteAsync(string bucketName, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Gets the website configuration for the specified bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the website configuration.</returns>
+    public async Task<GetBucketWebsiteResponse> GetBucketWebsiteAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        var request = new GetBucketWebsiteRequest { BucketName = bucketName };
+        return await GetBucketWebsiteAsync(request, cancellationToken);
+    }
 
-    public Task<GetBucketWebsiteResponse> GetBucketWebsiteAsync(GetBucketWebsiteRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Gets the website configuration for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the website configuration.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist or has no website configuration.</exception>
+    public async Task<GetBucketWebsiteResponse> GetBucketWebsiteAsync(GetBucketWebsiteRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDoc = _database.GetDocument($"bucket::{request.BucketName}");
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
 
-    public Task<GetCORSConfigurationResponse> GetCORSConfigurationAsync(string bucketName, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            var websiteDict = bucketDoc.GetDictionary("websiteConfiguration");
+            if (websiteDict == null)
+            {
+                throw new AmazonS3Exception("The specified bucket does not have a website configuration")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchWebsiteConfiguration"
+                };
+            }
 
-    public Task<GetCORSConfigurationResponse> GetCORSConfigurationAsync(GetCORSConfigurationRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            var config = new WebsiteConfiguration();
 
-    public Task<GetLifecycleConfigurationResponse> GetLifecycleConfigurationAsync(string bucketName, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            // Parse index document
+            var indexDocDict = websiteDict.GetDictionary("indexDocument");
+            if (indexDocDict != null)
+            {
+                config.IndexDocumentSuffix = indexDocDict.GetString("suffix");
+            }
 
-    public Task<GetLifecycleConfigurationResponse> GetLifecycleConfigurationAsync(GetLifecycleConfigurationRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            // Parse error document
+            var errorDocDict = websiteDict.GetDictionary("errorDocument");
+            if (errorDocDict != null)
+            {
+                config.ErrorDocument = errorDocDict.GetString("key");
+            }
+
+            // Parse redirect all requests
+            var redirectAllDict = websiteDict.GetDictionary("redirectAllRequestsTo");
+            if (redirectAllDict != null)
+            {
+                config.RedirectAllRequestsTo = new RoutingRuleRedirect
+                {
+                    HostName = redirectAllDict.GetString("hostName"),
+                    Protocol = redirectAllDict.GetString("protocol")
+                };
+            }
+
+            // Parse routing rules
+            var routingRulesArray = websiteDict.GetArray("routingRules");
+            if (routingRulesArray != null)
+            {
+                config.RoutingRules = new List<RoutingRule>();
+                foreach (var ruleItem in routingRulesArray)
+                {
+                    if (ruleItem is DictionaryObject ruleDict)
+                    {
+                        var rule = new RoutingRule();
+
+                        var conditionDict = ruleDict.GetDictionary("condition");
+                        if (conditionDict != null)
+                        {
+                            rule.Condition = new RoutingRuleCondition
+                            {
+                                KeyPrefixEquals = conditionDict.GetString("keyPrefixEquals"),
+                                HttpErrorCodeReturnedEquals = conditionDict.GetString("httpErrorCodeReturnedEquals")
+                            };
+                        }
+
+                        var redirectDict = ruleDict.GetDictionary("redirect");
+                        if (redirectDict != null)
+                        {
+                            rule.Redirect = new RoutingRuleRedirect
+                            {
+                                HostName = redirectDict.GetString("hostName"),
+                                Protocol = redirectDict.GetString("protocol"),
+                                ReplaceKeyWith = redirectDict.GetString("replaceKeyWith"),
+                                ReplaceKeyPrefixWith = redirectDict.GetString("replaceKeyPrefixWith"),
+                                HttpRedirectCode = redirectDict.GetString("httpRedirectCode")
+                            };
+                        }
+
+                        config.RoutingRules.Add(rule);
+                    }
+                }
+            }
+
+            return new GetBucketWebsiteResponse
+            {
+                WebsiteConfiguration = config,
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Gets the CORS configuration for the specified bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the CORS configuration.</returns>
+    public async Task<GetCORSConfigurationResponse> GetCORSConfigurationAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        var request = new GetCORSConfigurationRequest { BucketName = bucketName };
+        return await GetCORSConfigurationAsync(request, cancellationToken);
+    }
+
+    /// <summary>
+    /// Gets the CORS configuration for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the CORS configuration.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist or has no CORS configuration.</exception>
+    public async Task<GetCORSConfigurationResponse> GetCORSConfigurationAsync(GetCORSConfigurationRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDoc = _database.GetDocument($"bucket::{request.BucketName}");
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            var corsDict = bucketDoc.GetDictionary("corsConfiguration");
+            if (corsDict == null)
+            {
+                throw new AmazonS3Exception("The CORS configuration does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchCORSConfiguration"
+                };
+            }
+
+            var rules = new List<CORSRule>();
+            var rulesArray = corsDict.GetArray("rules");
+            if (rulesArray != null)
+            {
+                foreach (var ruleItem in rulesArray)
+                {
+                    if (ruleItem is DictionaryObject ruleDict)
+                    {
+                        var rule = new CORSRule
+                        {
+                            Id = ruleDict.GetString("id"),
+                            MaxAgeSeconds = (int)ruleDict.GetLong("maxAgeSeconds")
+                        };
+
+                        // Parse allowed headers
+                        var allowedHeadersArray = ruleDict.GetArray("allowedHeaders");
+                        if (allowedHeadersArray != null)
+                        {
+                            rule.AllowedHeaders = allowedHeadersArray.Select(h => h?.ToString() ?? string.Empty).ToList();
+                        }
+
+                        // Parse allowed methods
+                        var allowedMethodsArray = ruleDict.GetArray("allowedMethods");
+                        if (allowedMethodsArray != null)
+                        {
+                            rule.AllowedMethods = allowedMethodsArray.Select(m => m?.ToString() ?? string.Empty).ToList();
+                        }
+
+                        // Parse allowed origins
+                        var allowedOriginsArray = ruleDict.GetArray("allowedOrigins");
+                        if (allowedOriginsArray != null)
+                        {
+                            rule.AllowedOrigins = allowedOriginsArray.Select(o => o?.ToString() ?? string.Empty).ToList();
+                        }
+
+                        // Parse expose headers
+                        var exposeHeadersArray = ruleDict.GetArray("exposeHeaders");
+                        if (exposeHeadersArray != null)
+                        {
+                            rule.ExposeHeaders = exposeHeadersArray.Select(e => e?.ToString() ?? string.Empty).ToList();
+                        }
+
+                        rules.Add(rule);
+                    }
+                }
+            }
+
+            return new GetCORSConfigurationResponse
+            {
+                Configuration = new CORSConfiguration { Rules = rules },
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Gets the lifecycle configuration for the specified bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the lifecycle configuration.</returns>
+    public async Task<GetLifecycleConfigurationResponse> GetLifecycleConfigurationAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        var request = new GetLifecycleConfigurationRequest { BucketName = bucketName };
+        return await GetLifecycleConfigurationAsync(request, cancellationToken);
+    }
+
+    /// <summary>
+    /// Gets the lifecycle configuration for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response containing the lifecycle configuration.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist or has no lifecycle configuration.</exception>
+    public async Task<GetLifecycleConfigurationResponse> GetLifecycleConfigurationAsync(GetLifecycleConfigurationRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDoc = _database.GetDocument($"bucket::{request.BucketName}");
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            var lifecycleDict = bucketDoc.GetDictionary("lifecycleConfiguration");
+            if (lifecycleDict == null)
+            {
+                throw new AmazonS3Exception("The lifecycle configuration does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchLifecycleConfiguration"
+                };
+            }
+
+            var rules = new List<LifecycleRule>();
+            var rulesArray = lifecycleDict.GetArray("rules");
+            if (rulesArray != null)
+            {
+                foreach (var ruleItem in rulesArray)
+                {
+                    if (ruleItem is DictionaryObject ruleDict)
+                    {
+                        var rule = new LifecycleRule
+                        {
+                            Id = ruleDict.GetString("id"),
+                            Status = new LifecycleRuleStatus(ruleDict.GetString("status") ?? "Enabled"),
+                            Prefix = ruleDict.GetString("prefix") ?? string.Empty
+                        };
+
+                        // Parse expiration
+                        var expirationDict = ruleDict.GetDictionary("expiration");
+                        if (expirationDict != null)
+                        {
+                            rule.Expiration = new LifecycleRuleExpiration
+                            {
+                                Days = (int)expirationDict.GetLong("days"),
+                                ExpiredObjectDeleteMarker = expirationDict.GetBoolean("expiredObjectDeleteMarker")
+                            };
+                            var dateStr = expirationDict.GetString("date");
+                            if (!string.IsNullOrEmpty(dateStr))
+                            {
+                                rule.Expiration.DateUtc = DateTime.Parse(dateStr);
+                            }
+                        }
+
+                        // Parse transitions
+                        var transitionsArray = ruleDict.GetArray("transitions");
+                        if (transitionsArray != null)
+                        {
+                            rule.Transitions = new List<LifecycleTransition>();
+                            foreach (var transItem in transitionsArray)
+                            {
+                                if (transItem is DictionaryObject transDict)
+                                {
+                                    var transition = new LifecycleTransition
+                                    {
+                                        Days = (int)transDict.GetLong("days"),
+                                        StorageClass = new S3StorageClass(transDict.GetString("storageClass") ?? "STANDARD_IA")
+                                    };
+                                    rule.Transitions.Add(transition);
+                                }
+                            }
+                        }
+
+                        // Parse noncurrent version expiration
+                        var noncurrentExpDict = ruleDict.GetDictionary("noncurrentVersionExpiration");
+                        if (noncurrentExpDict != null)
+                        {
+                            rule.NoncurrentVersionExpiration = new LifecycleRuleNoncurrentVersionExpiration
+                            {
+                                NoncurrentDays = (int)noncurrentExpDict.GetLong("noncurrentDays"),
+                                NewerNoncurrentVersions = (int)noncurrentExpDict.GetLong("newerNoncurrentVersions")
+                            };
+                        }
+
+                        rules.Add(rule);
+                    }
+                }
+            }
+
+            return new GetLifecycleConfigurationResponse
+            {
+                Configuration = new LifecycleConfiguration { Rules = rules },
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public IDictionary<string, string> GetAllObjectMetadata(string bucketName, string objectKey, IDictionary<string, string> metadata)
         => throw new NotImplementedException();
@@ -2739,8 +3353,63 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<PutBucketAnalyticsConfigurationResponse> PutBucketAnalyticsConfigurationAsync(PutBucketAnalyticsConfigurationRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<PutBucketEncryptionResponse> PutBucketEncryptionAsync(PutBucketEncryptionRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Sets the encryption configuration for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name and encryption configuration.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the put operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<PutBucketEncryptionResponse> PutBucketEncryptionAsync(PutBucketEncryptionRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDocId = $"bucket::{request.BucketName}";
+            var bucketDoc = _database.GetDocument(bucketDocId);
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            using (var mutableDoc = bucketDoc.ToMutable())
+            {
+                var encryptionDict = new MutableDictionaryObject();
+                var rulesArray = new MutableArrayObject();
+
+                if (request.ServerSideEncryptionConfiguration?.ServerSideEncryptionRules != null)
+                {
+                    foreach (var rule in request.ServerSideEncryptionConfiguration.ServerSideEncryptionRules)
+                    {
+                        var ruleDict = new MutableDictionaryObject();
+                        if (rule.ServerSideEncryptionByDefault != null)
+                        {
+                            ruleDict.SetString("sseAlgorithm",
+                                rule.ServerSideEncryptionByDefault.ServerSideEncryptionAlgorithm?.Value ?? "AES256");
+                            if (!string.IsNullOrEmpty(rule.ServerSideEncryptionByDefault.KMSMasterKeyID))
+                            {
+                                ruleDict.SetString("kmsMasterKeyId", rule.ServerSideEncryptionByDefault.KMSMasterKeyID);
+                            }
+                        }
+                        ruleDict.SetBoolean("bucketKeyEnabled", rule.BucketKeyEnabled);
+                        rulesArray.AddDictionary(ruleDict);
+                    }
+                }
+
+                encryptionDict.SetArray("rules", rulesArray);
+                mutableDoc.SetDictionary("encryption", encryptionDict);
+                _database.Save(mutableDoc);
+            }
+
+            return new PutBucketEncryptionResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<PutBucketIntelligentTieringConfigurationResponse> PutBucketIntelligentTieringConfigurationAsync(PutBucketIntelligentTieringConfigurationRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
@@ -2748,14 +3417,89 @@ public class CouchbaseS3Client : IAmazonS3
     public Task<PutBucketInventoryConfigurationResponse> PutBucketInventoryConfigurationAsync(PutBucketInventoryConfigurationRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<PutBucketLoggingResponse> PutBucketLoggingAsync(PutBucketLoggingRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Sets the logging configuration for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name and logging configuration.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the put operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<PutBucketLoggingResponse> PutBucketLoggingAsync(PutBucketLoggingRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDocId = $"bucket::{request.BucketName}";
+            var bucketDoc = _database.GetDocument(bucketDocId);
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            using (var mutableDoc = bucketDoc.ToMutable())
+            {
+                if (request.LoggingConfig != null &&
+                    !string.IsNullOrEmpty(request.LoggingConfig.TargetBucketName))
+                {
+                    var loggingDict = new MutableDictionaryObject();
+                    loggingDict.SetString("targetBucket", request.LoggingConfig.TargetBucketName);
+                    loggingDict.SetString("targetPrefix", request.LoggingConfig.TargetPrefix);
+                    mutableDoc.SetDictionary("loggingConfiguration", loggingDict);
+                }
+                else
+                {
+                    mutableDoc.Remove("loggingConfiguration");
+                }
+                _database.Save(mutableDoc);
+            }
+
+            return new PutBucketLoggingResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<PutBucketMetricsConfigurationResponse> PutBucketMetricsConfigurationAsync(PutBucketMetricsConfigurationRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<PutBucketNotificationResponse> PutBucketNotificationAsync(PutBucketNotificationRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Sets the notification configuration for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name and notification configuration.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the put operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    /// <remarks>
+    /// In Couchbase Lite local storage, notifications are not actually sent anywhere,
+    /// but the configuration is stored for API compatibility.
+    /// </remarks>
+    public async Task<PutBucketNotificationResponse> PutBucketNotificationAsync(PutBucketNotificationRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDocId = $"bucket::{request.BucketName}";
+            var bucketDoc = _database.GetDocument(bucketDocId);
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            // For local storage, we acknowledge the configuration but don't actually
+            // set up any notifications since there's no cloud infrastructure
+            return new PutBucketNotificationResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<PutBucketOwnershipControlsResponse> PutBucketOwnershipControlsAsync(PutBucketOwnershipControlsRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
@@ -2916,23 +3660,325 @@ public class CouchbaseS3Client : IAmazonS3
         }, cancellationToken);
     }
 
-    public Task<PutBucketWebsiteResponse> PutBucketWebsiteAsync(string bucketName, WebsiteConfiguration websiteConfiguration, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Sets the website configuration for the specified bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="websiteConfiguration">The website configuration.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the put operation.</returns>
+    public async Task<PutBucketWebsiteResponse> PutBucketWebsiteAsync(string bucketName, WebsiteConfiguration websiteConfiguration, CancellationToken cancellationToken = default)
+    {
+        var request = new PutBucketWebsiteRequest { BucketName = bucketName, WebsiteConfiguration = websiteConfiguration };
+        return await PutBucketWebsiteAsync(request, cancellationToken);
+    }
 
-    public Task<PutBucketWebsiteResponse> PutBucketWebsiteAsync(PutBucketWebsiteRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    /// <summary>
+    /// Sets the website configuration for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name and website configuration.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the put operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<PutBucketWebsiteResponse> PutBucketWebsiteAsync(PutBucketWebsiteRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDocId = $"bucket::{request.BucketName}";
+            var bucketDoc = _database.GetDocument(bucketDocId);
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
 
-    public Task<PutCORSConfigurationResponse> PutCORSConfigurationAsync(string bucketName, CORSConfiguration configuration, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            using (var mutableDoc = bucketDoc.ToMutable())
+            {
+                var websiteDict = new MutableDictionaryObject();
+                var config = request.WebsiteConfiguration;
 
-    public Task<PutCORSConfigurationResponse> PutCORSConfigurationAsync(PutCORSConfigurationRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+                if (config != null)
+                {
+                    // Serialize index document
+                    if (!string.IsNullOrEmpty(config.IndexDocumentSuffix))
+                    {
+                        var indexDocDict = new MutableDictionaryObject();
+                        indexDocDict.SetString("suffix", config.IndexDocumentSuffix);
+                        websiteDict.SetDictionary("indexDocument", indexDocDict);
+                    }
 
-    public Task<PutLifecycleConfigurationResponse> PutLifecycleConfigurationAsync(string bucketName, LifecycleConfiguration configuration, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+                    // Serialize error document
+                    if (!string.IsNullOrEmpty(config.ErrorDocument))
+                    {
+                        var errorDocDict = new MutableDictionaryObject();
+                        errorDocDict.SetString("key", config.ErrorDocument);
+                        websiteDict.SetDictionary("errorDocument", errorDocDict);
+                    }
 
-    public Task<PutLifecycleConfigurationResponse> PutLifecycleConfigurationAsync(PutLifecycleConfigurationRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+                    // Serialize redirect all requests
+                    if (config.RedirectAllRequestsTo != null)
+                    {
+                        var redirectAllDict = new MutableDictionaryObject();
+                        redirectAllDict.SetString("hostName", config.RedirectAllRequestsTo.HostName);
+                        redirectAllDict.SetString("protocol", config.RedirectAllRequestsTo.Protocol);
+                        websiteDict.SetDictionary("redirectAllRequestsTo", redirectAllDict);
+                    }
+
+                    // Serialize routing rules
+                    if (config.RoutingRules != null && config.RoutingRules.Count > 0)
+                    {
+                        var routingRulesArray = new MutableArrayObject();
+                        foreach (var rule in config.RoutingRules)
+                        {
+                            var ruleDict = new MutableDictionaryObject();
+
+                            if (rule.Condition != null)
+                            {
+                                var conditionDict = new MutableDictionaryObject();
+                                conditionDict.SetString("keyPrefixEquals", rule.Condition.KeyPrefixEquals);
+                                conditionDict.SetString("httpErrorCodeReturnedEquals", rule.Condition.HttpErrorCodeReturnedEquals);
+                                ruleDict.SetDictionary("condition", conditionDict);
+                            }
+
+                            if (rule.Redirect != null)
+                            {
+                                var redirectDict = new MutableDictionaryObject();
+                                redirectDict.SetString("hostName", rule.Redirect.HostName);
+                                redirectDict.SetString("protocol", rule.Redirect.Protocol);
+                                redirectDict.SetString("replaceKeyWith", rule.Redirect.ReplaceKeyWith);
+                                redirectDict.SetString("replaceKeyPrefixWith", rule.Redirect.ReplaceKeyPrefixWith);
+                                redirectDict.SetString("httpRedirectCode", rule.Redirect.HttpRedirectCode);
+                                ruleDict.SetDictionary("redirect", redirectDict);
+                            }
+
+                            routingRulesArray.AddDictionary(ruleDict);
+                        }
+                        websiteDict.SetArray("routingRules", routingRulesArray);
+                    }
+                }
+
+                mutableDoc.SetDictionary("websiteConfiguration", websiteDict);
+                _database.Save(mutableDoc);
+            }
+
+            return new PutBucketWebsiteResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Sets the CORS configuration for the specified bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="configuration">The CORS configuration.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the put operation.</returns>
+    public async Task<PutCORSConfigurationResponse> PutCORSConfigurationAsync(string bucketName, CORSConfiguration configuration, CancellationToken cancellationToken = default)
+    {
+        var request = new PutCORSConfigurationRequest { BucketName = bucketName, Configuration = configuration };
+        return await PutCORSConfigurationAsync(request, cancellationToken);
+    }
+
+    /// <summary>
+    /// Sets the CORS configuration for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name and CORS configuration.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the put operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<PutCORSConfigurationResponse> PutCORSConfigurationAsync(PutCORSConfigurationRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDocId = $"bucket::{request.BucketName}";
+            var bucketDoc = _database.GetDocument(bucketDocId);
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            using (var mutableDoc = bucketDoc.ToMutable())
+            {
+                var corsDict = new MutableDictionaryObject();
+                var rulesArray = new MutableArrayObject();
+
+                if (request.Configuration?.Rules != null)
+                {
+                    foreach (var rule in request.Configuration.Rules)
+                    {
+                        var ruleDict = new MutableDictionaryObject();
+                        ruleDict.SetString("id", rule.Id);
+                        ruleDict.SetLong("maxAgeSeconds", rule.MaxAgeSeconds);
+
+                        // Serialize allowed headers
+                        if (rule.AllowedHeaders != null)
+                        {
+                            var headersArray = new MutableArrayObject();
+                            foreach (var header in rule.AllowedHeaders)
+                            {
+                                headersArray.AddString(header);
+                            }
+                            ruleDict.SetArray("allowedHeaders", headersArray);
+                        }
+
+                        // Serialize allowed methods
+                        if (rule.AllowedMethods != null)
+                        {
+                            var methodsArray = new MutableArrayObject();
+                            foreach (var method in rule.AllowedMethods)
+                            {
+                                methodsArray.AddString(method);
+                            }
+                            ruleDict.SetArray("allowedMethods", methodsArray);
+                        }
+
+                        // Serialize allowed origins
+                        if (rule.AllowedOrigins != null)
+                        {
+                            var originsArray = new MutableArrayObject();
+                            foreach (var origin in rule.AllowedOrigins)
+                            {
+                                originsArray.AddString(origin);
+                            }
+                            ruleDict.SetArray("allowedOrigins", originsArray);
+                        }
+
+                        // Serialize expose headers
+                        if (rule.ExposeHeaders != null)
+                        {
+                            var exposeArray = new MutableArrayObject();
+                            foreach (var header in rule.ExposeHeaders)
+                            {
+                                exposeArray.AddString(header);
+                            }
+                            ruleDict.SetArray("exposeHeaders", exposeArray);
+                        }
+
+                        rulesArray.AddDictionary(ruleDict);
+                    }
+                }
+
+                corsDict.SetArray("rules", rulesArray);
+                mutableDoc.SetDictionary("corsConfiguration", corsDict);
+                _database.Save(mutableDoc);
+            }
+
+            return new PutCORSConfigurationResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Sets the lifecycle configuration for the specified bucket.
+    /// </summary>
+    /// <param name="bucketName">The name of the bucket.</param>
+    /// <param name="configuration">The lifecycle configuration.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the put operation.</returns>
+    public async Task<PutLifecycleConfigurationResponse> PutLifecycleConfigurationAsync(string bucketName, LifecycleConfiguration configuration, CancellationToken cancellationToken = default)
+    {
+        var request = new PutLifecycleConfigurationRequest { BucketName = bucketName, Configuration = configuration };
+        return await PutLifecycleConfigurationAsync(request, cancellationToken);
+    }
+
+    /// <summary>
+    /// Sets the lifecycle configuration for the specified bucket.
+    /// </summary>
+    /// <param name="request">The request containing the bucket name and lifecycle configuration.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A response indicating the result of the put operation.</returns>
+    /// <exception cref="AmazonS3Exception">Thrown when the bucket does not exist.</exception>
+    public async Task<PutLifecycleConfigurationResponse> PutLifecycleConfigurationAsync(PutLifecycleConfigurationRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var bucketDocId = $"bucket::{request.BucketName}";
+            var bucketDoc = _database.GetDocument(bucketDocId);
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            using (var mutableDoc = bucketDoc.ToMutable())
+            {
+                var lifecycleDict = new MutableDictionaryObject();
+                var rulesArray = new MutableArrayObject();
+
+                if (request.Configuration?.Rules != null)
+                {
+                    foreach (var rule in request.Configuration.Rules)
+                    {
+                        var ruleDict = new MutableDictionaryObject();
+                        ruleDict.SetString("id", rule.Id);
+                        ruleDict.SetString("status", rule.Status?.Value ?? "Enabled");
+                        ruleDict.SetString("prefix", rule.Prefix);
+
+                        // Serialize expiration
+                        if (rule.Expiration != null)
+                        {
+                            var expirationDict = new MutableDictionaryObject();
+                            expirationDict.SetLong("days", rule.Expiration.Days);
+                            expirationDict.SetBoolean("expiredObjectDeleteMarker", rule.Expiration.ExpiredObjectDeleteMarker);
+                            if (rule.Expiration.DateUtc != DateTime.MinValue)
+                            {
+                                expirationDict.SetString("date", rule.Expiration.DateUtc.ToString("o"));
+                            }
+                            ruleDict.SetDictionary("expiration", expirationDict);
+                        }
+
+                        // Serialize transitions
+                        if (rule.Transitions != null && rule.Transitions.Count > 0)
+                        {
+                            var transitionsArray = new MutableArrayObject();
+                            foreach (var transition in rule.Transitions)
+                            {
+                                var transDict = new MutableDictionaryObject();
+                                transDict.SetLong("days", transition.Days);
+                                transDict.SetString("storageClass", transition.StorageClass?.Value);
+                                transitionsArray.AddDictionary(transDict);
+                            }
+                            ruleDict.SetArray("transitions", transitionsArray);
+                        }
+
+                        // Serialize noncurrent version expiration
+                        if (rule.NoncurrentVersionExpiration != null)
+                        {
+                            var noncurrentExpDict = new MutableDictionaryObject();
+                            noncurrentExpDict.SetLong("noncurrentDays", rule.NoncurrentVersionExpiration.NoncurrentDays);
+                            noncurrentExpDict.SetLong("newerNoncurrentVersions", rule.NoncurrentVersionExpiration.NewerNoncurrentVersions);
+                            ruleDict.SetDictionary("noncurrentVersionExpiration", noncurrentExpDict);
+                        }
+
+                        rulesArray.AddDictionary(ruleDict);
+                    }
+                }
+
+                lifecycleDict.SetArray("rules", rulesArray);
+                mutableDoc.SetDictionary("lifecycleConfiguration", lifecycleDict);
+                _database.Save(mutableDoc);
+            }
+
+            return new PutLifecycleConfigurationResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<PutObjectLegalHoldResponse> PutObjectLegalHoldAsync(PutObjectLegalHoldRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();

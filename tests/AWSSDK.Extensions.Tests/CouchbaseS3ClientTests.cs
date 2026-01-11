@@ -2059,4 +2059,333 @@ public class CouchbaseS3ClientTests
     }
 
     #endregion
+
+    #region Bucket Configuration Tests
+
+    [Test]
+    public async Task PutBucketEncryption_SetsConfiguration_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+
+        var request = new PutBucketEncryptionRequest
+        {
+            BucketName = "test-bucket",
+            ServerSideEncryptionConfiguration = new ServerSideEncryptionConfiguration
+            {
+                ServerSideEncryptionRules = new List<ServerSideEncryptionRule>
+                {
+                    new ServerSideEncryptionRule
+                    {
+                        ServerSideEncryptionByDefault = new ServerSideEncryptionByDefault
+                        {
+                            ServerSideEncryptionAlgorithm = ServerSideEncryptionMethod.AES256
+                        },
+                        BucketKeyEnabled = true
+                    }
+                }
+            }
+        };
+
+        // Act
+        var response = await _client.PutBucketEncryptionAsync(request);
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GetBucketEncryption_ReturnsConfiguration_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutBucketEncryptionAsync(new PutBucketEncryptionRequest
+        {
+            BucketName = "test-bucket",
+            ServerSideEncryptionConfiguration = new ServerSideEncryptionConfiguration
+            {
+                ServerSideEncryptionRules = new List<ServerSideEncryptionRule>
+                {
+                    new ServerSideEncryptionRule
+                    {
+                        ServerSideEncryptionByDefault = new ServerSideEncryptionByDefault
+                        {
+                            ServerSideEncryptionAlgorithm = ServerSideEncryptionMethod.AES256
+                        }
+                    }
+                }
+            }
+        });
+
+        // Act
+        var response = await _client.GetBucketEncryptionAsync(new GetBucketEncryptionRequest
+        {
+            BucketName = "test-bucket"
+        });
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.ServerSideEncryptionConfiguration, Is.Not.Null);
+    }
+
+    [Test]
+    public async Task DeleteBucketEncryption_RemovesConfiguration_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutBucketEncryptionAsync(new PutBucketEncryptionRequest
+        {
+            BucketName = "test-bucket",
+            ServerSideEncryptionConfiguration = new ServerSideEncryptionConfiguration
+            {
+                ServerSideEncryptionRules = new List<ServerSideEncryptionRule>
+                {
+                    new ServerSideEncryptionRule
+                    {
+                        ServerSideEncryptionByDefault = new ServerSideEncryptionByDefault
+                        {
+                            ServerSideEncryptionAlgorithm = ServerSideEncryptionMethod.AES256
+                        }
+                    }
+                }
+            }
+        });
+
+        // Act
+        var response = await _client.DeleteBucketEncryptionAsync(new DeleteBucketEncryptionRequest
+        {
+            BucketName = "test-bucket"
+        });
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+    }
+
+    [Test]
+    public async Task PutLifecycleConfiguration_SetsConfiguration_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+
+        var configuration = new LifecycleConfiguration
+        {
+            Rules = new List<LifecycleRule>
+            {
+                new LifecycleRule
+                {
+                    Id = "expire-old-objects",
+                    Status = LifecycleRuleStatus.Enabled,
+                    Prefix = "logs/",
+                    Expiration = new LifecycleRuleExpiration { Days = 30 }
+                }
+            }
+        };
+
+        // Act
+        var response = await _client.PutLifecycleConfigurationAsync("test-bucket", configuration);
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GetLifecycleConfiguration_ReturnsConfiguration_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutLifecycleConfigurationAsync("test-bucket", new LifecycleConfiguration
+        {
+            Rules = new List<LifecycleRule>
+            {
+                new LifecycleRule
+                {
+                    Id = "test-rule",
+                    Status = LifecycleRuleStatus.Enabled,
+                    Prefix = "",
+                    Expiration = new LifecycleRuleExpiration { Days = 7 }
+                }
+            }
+        });
+
+        // Act
+        var response = await _client.GetLifecycleConfigurationAsync("test-bucket");
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.Configuration, Is.Not.Null);
+        Assert.That(response.Configuration.Rules.Count, Is.EqualTo(1));
+        Assert.That(response.Configuration.Rules[0].Id, Is.EqualTo("test-rule"));
+    }
+
+    [Test]
+    public async Task PutCORSConfiguration_SetsConfiguration_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+
+        var configuration = new CORSConfiguration
+        {
+            Rules = new List<CORSRule>
+            {
+                new CORSRule
+                {
+                    Id = "allow-all",
+                    AllowedOrigins = new List<string> { "*" },
+                    AllowedMethods = new List<string> { "GET", "PUT" },
+                    AllowedHeaders = new List<string> { "*" },
+                    MaxAgeSeconds = 3600
+                }
+            }
+        };
+
+        // Act
+        var response = await _client.PutCORSConfigurationAsync("test-bucket", configuration);
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GetCORSConfiguration_ReturnsConfiguration_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutCORSConfigurationAsync("test-bucket", new CORSConfiguration
+        {
+            Rules = new List<CORSRule>
+            {
+                new CORSRule
+                {
+                    Id = "test-cors",
+                    AllowedOrigins = new List<string> { "https://example.com" },
+                    AllowedMethods = new List<string> { "GET" }
+                }
+            }
+        });
+
+        // Act
+        var response = await _client.GetCORSConfigurationAsync("test-bucket");
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.Configuration, Is.Not.Null);
+        Assert.That(response.Configuration.Rules.Count, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task PutBucketWebsite_SetsConfiguration_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+
+        var configuration = new WebsiteConfiguration
+        {
+            IndexDocumentSuffix = "index.html",
+            ErrorDocument = "error.html"
+        };
+
+        // Act
+        var response = await _client.PutBucketWebsiteAsync("test-bucket", configuration);
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GetBucketWebsite_ReturnsConfiguration_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutBucketWebsiteAsync("test-bucket", new WebsiteConfiguration
+        {
+            IndexDocumentSuffix = "index.html"
+        });
+
+        // Act
+        var response = await _client.GetBucketWebsiteAsync("test-bucket");
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.WebsiteConfiguration, Is.Not.Null);
+        Assert.That(response.WebsiteConfiguration.IndexDocumentSuffix, Is.EqualTo("index.html"));
+    }
+
+    [Test]
+    public async Task PutBucketLogging_SetsConfiguration_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutBucketAsync("log-bucket");
+
+        var request = new PutBucketLoggingRequest
+        {
+            BucketName = "test-bucket",
+            LoggingConfig = new S3BucketLoggingConfig
+            {
+                TargetBucketName = "log-bucket",
+                TargetPrefix = "logs/"
+            }
+        };
+
+        // Act
+        var response = await _client.PutBucketLoggingAsync(request);
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GetBucketLogging_ReturnsConfiguration_Successfully()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+        await _client.PutBucketAsync("log-bucket");
+        await _client.PutBucketLoggingAsync(new PutBucketLoggingRequest
+        {
+            BucketName = "test-bucket",
+            LoggingConfig = new S3BucketLoggingConfig
+            {
+                TargetBucketName = "log-bucket",
+                TargetPrefix = "prefix/"
+            }
+        });
+
+        // Act
+        var response = await _client.GetBucketLoggingAsync("test-bucket");
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.BucketLoggingConfig, Is.Not.Null);
+        Assert.That(response.BucketLoggingConfig.TargetBucketName, Is.EqualTo("log-bucket"));
+    }
+
+    [Test]
+    public async Task GetBucketNotification_ReturnsEmptyConfiguration()
+    {
+        // Arrange
+        await _client.PutBucketAsync("test-bucket");
+
+        // Act
+        var response = await _client.GetBucketNotificationAsync("test-bucket");
+
+        // Assert
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.TopicConfigurations, Is.Empty);
+        Assert.That(response.QueueConfigurations, Is.Empty);
+        Assert.That(response.LambdaFunctionConfigurations, Is.Empty);
+    }
+
+    #endregion
 }
