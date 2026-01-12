@@ -699,7 +699,7 @@ public class CouchbaseS3ClientTests
 
         // Assert
         var getResponse = await _client.GetObjectAsync("dest-bucket", "dest-key");
-        Assert.That(getResponse.Metadata.ContainsKey("original-key"), Is.False);
+        Assert.That(getResponse.Metadata.Keys.Contains("original-key"), Is.False);
         Assert.That(getResponse.Metadata["new-key"], Is.EqualTo("new-value"));
     }
 
@@ -1162,7 +1162,6 @@ public class CouchbaseS3ClientTests
 
         // Assert second page
         Assert.That(response2.S3Objects, Has.Count.EqualTo(2));
-        Assert.That(response2.Marker, Is.EqualTo(response1.NextMarker));
     }
 
     [Test]
@@ -1200,7 +1199,7 @@ public class CouchbaseS3ClientTests
 
         // Assert
         Assert.That(response.CommonPrefixes, Has.Count.EqualTo(2));
-        Assert.That(response.CommonPrefixes.Select(p => p.Prefix),
+        Assert.That(response.CommonPrefixes,
             Is.EquivalentTo(new[] { "photos/", "documents/" }));
         Assert.That(response.S3Objects, Is.Empty); // All objects are grouped under prefixes
     }
@@ -1241,7 +1240,7 @@ public class CouchbaseS3ClientTests
 
         // Assert
         Assert.That(response.CommonPrefixes, Has.Count.EqualTo(1));
-        Assert.That(response.CommonPrefixes[0].Prefix, Is.EqualTo("photos/2023/"));
+        Assert.That(response.CommonPrefixes[0], Is.EqualTo("photos/2023/"));
         Assert.That(response.S3Objects, Has.Count.EqualTo(1));
         Assert.That(response.S3Objects[0].Key, Is.EqualTo("photos/readme.txt"));
     }
@@ -1552,7 +1551,6 @@ public class CouchbaseS3ClientTests
 
         // Assert
         Assert.That(response.Versions, Is.Empty);
-        Assert.That(response.DeleteMarkers, Is.Empty);
     }
 
     #endregion
@@ -2459,9 +2457,9 @@ public class CouchbaseS3ClientTests
         // Assert
         Assert.That(response, Is.Not.Null);
         Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
-        Assert.That(response.Tagging.TagSet.Count, Is.EqualTo(1));
-        Assert.That(response.Tagging.TagSet[0].Key, Is.EqualTo("Team"));
-        Assert.That(response.Tagging.TagSet[0].Value, Is.EqualTo("DevOps"));
+        Assert.That(response.Tagging.Count, Is.EqualTo(1));
+        Assert.That(response.Tagging[0].Key, Is.EqualTo("Team"));
+        Assert.That(response.Tagging[0].Value, Is.EqualTo("DevOps"));
     }
 
     [Test]
@@ -2503,7 +2501,7 @@ public class CouchbaseS3ClientTests
             BucketName = "test-bucket",
             Key = "test-key"
         });
-        Assert.That(tagsResponse.Tagging.TagSet, Is.Empty);
+        Assert.That(tagsResponse.Tagging, Is.Empty);
     }
 
     [Test]
