@@ -1,15 +1,9 @@
+using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
-using Amazon.Runtime;
 using Couchbase.Lite;
 using Couchbase.Lite.Query;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Net;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace AWSSDK.Extensions;
 
