@@ -71,7 +71,7 @@ public class DeleteObjectVersioningBehaviorAcceptanceTests : IDisposable
         // Assert
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.HttpStatusCode);
         Assert.NotNull(deleteResponse.VersionId);
-        Assert.True(deleteResponse.DeleteMarker);
+        Assert.Equal("true", deleteResponse.DeleteMarker);
 
         // Version v1 should still exist
         var listResponse = await _client.ListVersionsAsync(bucketName);
@@ -233,7 +233,7 @@ public class DeleteObjectVersioningBehaviorAcceptanceTests : IDisposable
 
         // Assert
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.HttpStatusCode);
-        Assert.True(deleteResponse.DeleteMarker);
+        Assert.Equal("true", deleteResponse.DeleteMarker);
 
         // Object should now be accessible again
         var getResponse = await _client.GetObjectAsync(bucketName, "file.txt");
@@ -280,12 +280,12 @@ public class DeleteObjectVersioningBehaviorAcceptanceTests : IDisposable
 
         // Assert
         Assert.Equal(HttpStatusCode.NoContent, deleteMarker2.HttpStatusCode);
-        Assert.True(deleteMarker2.DeleteMarker);
+        Assert.Equal("true", deleteMarker2.DeleteMarker);
         Assert.NotEqual(deleteMarker1.VersionId, deleteMarker2.VersionId);
 
-        // Both delete markers should exist
+        // Both delete markers should exist in Versions collection with IsDeleteMarker = true
         var listResponse = await _client.ListVersionsAsync(bucketName);
-        var deleteMarkers = listResponse.DeleteMarkers.Where(dm => dm.Key == "file.txt").ToList();
+        var deleteMarkers = listResponse.Versions.Where(v => v.Key == "file.txt" && v.IsDeleteMarker).ToList();
         Assert.Equal(2, deleteMarkers.Count);
     }
 
@@ -360,12 +360,12 @@ public class DeleteObjectVersioningBehaviorAcceptanceTests : IDisposable
 
         // Assert
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.HttpStatusCode);
-        Assert.True(deleteResponse.DeleteMarker);
+        Assert.Equal("true", deleteResponse.DeleteMarker);
         Assert.True(string.IsNullOrEmpty(deleteResponse.VersionId) || deleteResponse.VersionId == "null");
 
-        // Verify delete marker exists with null version
+        // Verify delete marker exists with null version (in Versions collection with IsDeleteMarker = true)
         var listResponse = await _client.ListVersionsAsync(bucketName);
-        var deleteMarker = listResponse.DeleteMarkers.FirstOrDefault(dm => dm.Key == "file.txt");
+        var deleteMarker = listResponse.Versions.FirstOrDefault(v => v.Key == "file.txt" && v.IsDeleteMarker);
         Assert.NotNull(deleteMarker);
         Assert.Equal("null", deleteMarker.VersionId);
     }
@@ -417,15 +417,15 @@ public class DeleteObjectVersioningBehaviorAcceptanceTests : IDisposable
 
         // Assert
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.HttpStatusCode);
-        Assert.True(deleteResponse.DeleteMarker);
+        Assert.Equal("true", deleteResponse.DeleteMarker);
 
-        // Verify versions still exist
+        // Verify versions still exist (exclude delete markers)
         var listResponse = await _client.ListVersionsAsync(bucketName);
-        Assert.Contains(listResponse.Versions, v => v.Key == "file.txt" && v.VersionId == putResponse1.VersionId);
-        Assert.Contains(listResponse.Versions, v => v.Key == "file.txt" && v.VersionId == putResponse2.VersionId);
+        Assert.Contains(listResponse.Versions, v => v.Key == "file.txt" && v.VersionId == putResponse1.VersionId && !v.IsDeleteMarker);
+        Assert.Contains(listResponse.Versions, v => v.Key == "file.txt" && v.VersionId == putResponse2.VersionId && !v.IsDeleteMarker);
 
         // Verify delete marker with null version exists
-        var deleteMarker = listResponse.DeleteMarkers.FirstOrDefault(dm => dm.Key == "file.txt");
+        var deleteMarker = listResponse.Versions.FirstOrDefault(v => v.Key == "file.txt" && v.IsDeleteMarker);
         Assert.NotNull(deleteMarker);
         Assert.Equal("null", deleteMarker.VersionId);
     }

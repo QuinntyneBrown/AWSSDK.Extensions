@@ -170,7 +170,7 @@ public class GetObjectMetadataWithVersionIdAcceptanceTests : IDisposable
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.HttpStatusCode);
-        Assert.True(response.DeleteMarker);
+        Assert.Equal("true", response.DeleteMarker);
         Assert.NotEqual(default, response.LastModified);
     }
 

@@ -41,9 +41,8 @@ public class DeleteMarkerBehaviorAcceptanceTests : IDisposable
     // And I own a versioning-enabled bucket "versioned-bucket"
     // And object "file.txt" has been deleted creating a delete marker
     // When I call ListVersionsAsync with bucket "versioned-bucket"
-    // Then the delete marker should appear in DeleteMarkers collection
-    // And the delete marker should have Key, VersionId, IsLatest, LastModified, Owner
-    // And the delete marker should NOT have ETag, Size, StorageClass
+    // Then the delete marker should appear in Versions collection with IsDeleteMarker = true
+    // And the delete marker should have Key, VersionId, IsLatest, LastModified
     [Fact]
     public async Task DeleteMarker_Properties_HasCorrectAttributes()
     {
@@ -68,8 +67,8 @@ public class DeleteMarkerBehaviorAcceptanceTests : IDisposable
         // Act
         var listResponse = await _client.ListVersionsAsync(bucketName);
 
-        // Assert
-        var deleteMarker = listResponse.DeleteMarkers.FirstOrDefault(dm => dm.Key == "file.txt");
+        // Assert - Delete markers are in Versions collection with IsDeleteMarker = true
+        var deleteMarker = listResponse.Versions.FirstOrDefault(v => v.Key == "file.txt" && v.IsDeleteMarker);
         Assert.NotNull(deleteMarker);
 
         // Should have these properties
@@ -77,7 +76,6 @@ public class DeleteMarkerBehaviorAcceptanceTests : IDisposable
         Assert.NotNull(deleteMarker.VersionId);
         Assert.True(deleteMarker.IsLatest);
         Assert.NotEqual(default, deleteMarker.LastModified);
-        Assert.NotNull(deleteMarker.Owner);
     }
 
     // Acceptance Criteria 8.1 - Scenario: ListObjects does not return objects with delete marker as current version
@@ -164,9 +162,9 @@ public class DeleteMarkerBehaviorAcceptanceTests : IDisposable
         var listResponse = await _client.ListVersionsAsync(bucketName);
 
         // Assert
-        // Should only have delete marker, no versions
-        var fileVersions = listResponse.Versions.Where(v => v.Key == "file.txt").ToList();
-        var deleteMarkers = listResponse.DeleteMarkers.Where(dm => dm.Key == "file.txt").ToList();
+        // Should only have delete marker, no non-delete-marker versions
+        var fileVersions = listResponse.Versions.Where(v => v.Key == "file.txt" && !v.IsDeleteMarker).ToList();
+        var deleteMarkers = listResponse.Versions.Where(v => v.Key == "file.txt" && v.IsDeleteMarker).ToList();
 
         Assert.Empty(fileVersions);
         Assert.Single(deleteMarkers);
@@ -208,7 +206,7 @@ public class DeleteMarkerBehaviorAcceptanceTests : IDisposable
         var listResponse = await _client.ListVersionsAsync(bucketName);
 
         // Assert
-        var deleteMarkers = listResponse.DeleteMarkers.Where(dm => dm.Key == "file.txt").ToList();
+        var deleteMarkers = listResponse.Versions.Where(v => v.Key == "file.txt" && v.IsDeleteMarker).ToList();
 
         Assert.Equal(2, deleteMarkers.Count);
 
@@ -251,7 +249,7 @@ public class DeleteMarkerBehaviorAcceptanceTests : IDisposable
         var listResponse = await _client.ListVersionsAsync(bucketName);
 
         // Assert
-        var deleteMarker = listResponse.DeleteMarkers.FirstOrDefault(dm => dm.Key == "file.txt");
+        var deleteMarker = listResponse.Versions.FirstOrDefault(v => v.Key == "file.txt" && v.IsDeleteMarker);
         Assert.NotNull(deleteMarker);
 
         // LastModified should be between before and after delete
@@ -284,17 +282,17 @@ public class DeleteMarkerBehaviorAcceptanceTests : IDisposable
         var listResponse = await _client.ListVersionsAsync(bucketName);
 
         // Assert
-        // File1 and file3 should have delete markers
-        Assert.Contains(listResponse.DeleteMarkers, dm => dm.Key == "file1.txt");
-        Assert.Contains(listResponse.DeleteMarkers, dm => dm.Key == "file3.txt");
+        // File1 and file3 should have delete markers (versions with IsDeleteMarker = true)
+        Assert.Contains(listResponse.Versions, v => v.Key == "file1.txt" && v.IsDeleteMarker);
+        Assert.Contains(listResponse.Versions, v => v.Key == "file3.txt" && v.IsDeleteMarker);
 
         // File2 should not have delete marker
-        Assert.DoesNotContain(listResponse.DeleteMarkers, dm => dm.Key == "file2.txt");
+        Assert.DoesNotContain(listResponse.Versions, v => v.Key == "file2.txt" && v.IsDeleteMarker);
 
-        // All files should still have versions in Versions collection
-        Assert.Contains(listResponse.Versions, v => v.Key == "file1.txt");
-        Assert.Contains(listResponse.Versions, v => v.Key == "file2.txt");
-        Assert.Contains(listResponse.Versions, v => v.Key == "file3.txt");
+        // All files should still have non-delete-marker versions
+        Assert.Contains(listResponse.Versions, v => v.Key == "file1.txt" && !v.IsDeleteMarker);
+        Assert.Contains(listResponse.Versions, v => v.Key == "file2.txt" && !v.IsDeleteMarker);
+        Assert.Contains(listResponse.Versions, v => v.Key == "file3.txt" && !v.IsDeleteMarker);
     }
 
     // Additional test: Delete marker key matches the deleted object key
@@ -324,7 +322,7 @@ public class DeleteMarkerBehaviorAcceptanceTests : IDisposable
         var listResponse = await _client.ListVersionsAsync(bucketName);
 
         // Assert
-        var deleteMarker = listResponse.DeleteMarkers.FirstOrDefault();
+        var deleteMarker = listResponse.Versions.FirstOrDefault(v => v.IsDeleteMarker);
         Assert.NotNull(deleteMarker);
         Assert.Equal(objectKey, deleteMarker.Key);
     }

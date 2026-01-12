@@ -105,7 +105,7 @@ public class MfaDeleteAcceptanceTests : IDisposable
 
         // Assert
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.HttpStatusCode);
-        Assert.True(deleteResponse.DeleteMarker);
+        Assert.Equal("true", deleteResponse.DeleteMarker);
     }
 
     // Acceptance Criteria 10.1 - Scenario: Verify MFA Delete status can be retrieved

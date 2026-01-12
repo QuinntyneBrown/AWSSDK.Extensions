@@ -86,11 +86,11 @@ public class ListVersionsAcceptanceTests : IDisposable
     // And I own a versioning-enabled bucket "versioned-bucket"
     // And object "deleted-file.txt" has been deleted (has a delete marker as current version)
     // When I call ListVersionsAsync with bucket name "versioned-bucket"
-    // Then the response should contain DeleteMarkers collection
+    // Then the response should contain versions with IsDeleteMarker = true
     // And the delete marker for "deleted-file.txt" should have IsLatest set to true
     // And the delete marker should have a VersionId
     [Fact]
-    public async Task ListVersionsAsync_WithDeleteMarkers_ReturnsDeleteMarkersCollection()
+    public async Task ListVersionsAsync_WithDeleteMarkers_ReturnsDeleteMarkersInVersionsCollection()
     {
         // Arrange
         var bucketName = "versioned-bucket";
@@ -110,9 +110,9 @@ public class ListVersionsAcceptanceTests : IDisposable
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.HttpStatusCode);
-        Assert.NotNull(response.DeleteMarkers);
 
-        var deleteMarker = response.DeleteMarkers.FirstOrDefault(dm => dm.Key == "deleted-file.txt");
+        // Delete markers are in Versions collection with IsDeleteMarker = true
+        var deleteMarker = response.Versions.FirstOrDefault(v => v.Key == "deleted-file.txt" && v.IsDeleteMarker);
         Assert.NotNull(deleteMarker);
         Assert.True(deleteMarker.IsLatest);
         Assert.NotNull(deleteMarker.VersionId);
@@ -374,7 +374,6 @@ public class ListVersionsAcceptanceTests : IDisposable
     // When I call ListVersionsAsync with bucket name "empty-bucket"
     // Then the response should have HTTP status code 200
     // And the Versions collection should be empty
-    // And the DeleteMarkers collection should be empty
     [Fact]
     public async Task ListVersionsAsync_EmptyBucket_ReturnsEmptyCollections()
     {
@@ -393,7 +392,6 @@ public class ListVersionsAcceptanceTests : IDisposable
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.HttpStatusCode);
         Assert.Empty(response.Versions);
-        Assert.Empty(response.DeleteMarkers);
     }
 
     // Acceptance Criteria 3.1 - Scenario: Fail to list versions on non-existent bucket
