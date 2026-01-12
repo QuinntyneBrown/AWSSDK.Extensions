@@ -11,7 +11,6 @@ A powerful extension library for AWS SDK that provides local Couchbase Lite impl
 ## Features
 
 - **Local S3 Implementation**: Full implementation of core AWS S3 operations using Couchbase Lite as the storage backend
-- **Transactional Support**: Enhanced version with atomic operations for multiple object updates
 - **Offline-First**: Perfect for development, testing, and scenarios requiring offline capabilities
 - **Compatible Interface**: Implements `IAmazonS3` interface for seamless integration with existing AWS SDK code
 
@@ -32,15 +31,6 @@ A Couchbase Lite-based implementation of the Amazon S3 interface that supports:
 - **Metadata Support**: Store and retrieve custom metadata with objects
 - **Prefix-based Listing**: Efficient object listing with prefix filters
 - **ETag Generation**: MD5-based ETag calculation for object integrity
-
-### CouchbaseS3ClientWithTransactions
-
-An enhanced version that adds transactional support:
-
-- **Atomic Multi-Object Operations**: Put or delete multiple objects atomically
-- **Copy Operations**: Atomic object copying between buckets
-- **Rollback on Failure**: Automatic rollback on transaction failures
-- **All CouchbaseS3Client Features**: Includes all base functionality
 
 ## Usage
 
@@ -80,38 +70,6 @@ var listResponse = await client.ListObjectsV2Async(new ListObjectsV2Request
 client.Dispose();
 ```
 
-### Transactional Operations
-
-```csharp
-using AWSSDK.Extensions;
-using Amazon.S3.Model;
-
-var client = new CouchbaseS3ClientWithTransactions("/path/to/database.cblite2");
-
-await client.PutBucketAsync("my-bucket");
-
-// Put multiple objects atomically
-var requests = new List<PutObjectRequest>
-{
-    new() { BucketName = "my-bucket", Key = "file1.txt", ContentBody = "Content 1" },
-    new() { BucketName = "my-bucket", Key = "file2.txt", ContentBody = "Content 2" },
-    new() { BucketName = "my-bucket", Key = "file3.txt", ContentBody = "Content 3" }
-};
-
-// All objects are created atomically - if any fails, none are created
-var responses = await client.PutObjectsTransactionalAsync(requests);
-
-// Copy objects atomically
-await client.CopyObjectAsync(
-    sourceBucket: "my-bucket",
-    sourceKey: "file1.txt",
-    destinationBucket: "my-bucket",
-    destinationKey: "file1-copy.txt"
-);
-
-client.Dispose();
-```
-
 ### Using with Metadata
 
 ```csharp
@@ -147,7 +105,7 @@ var author = getResponse.Metadata["author"]; // "John Doe"
 - ✅ `DeleteObjectAsync` - Delete single object
 - ✅ `DeleteObjectsAsync` - Delete multiple objects
 - ✅ `ListObjectsV2Async` - List objects with prefix support
-- ✅ `CopyObjectAsync` - Copy objects (Transactions only)
+- ✅ `CopyObjectAsync` - Copy objects
 
 ### Metadata
 - ✅ Custom metadata storage and retrieval
@@ -180,7 +138,6 @@ Tests cover:
 - Object operations (put, get, delete)
 - Metadata handling
 - Error conditions
-- Transactional operations
 - Edge cases
 
 ### Project Structure
@@ -189,12 +146,10 @@ Tests cover:
 AWSSDK.Extensions/
 ├── src/
 │   └── AWSSDK.Extensions/
-│       ├── CouchbaseS3Implementation.cs        # Base S3 implementation
-│       └── CouchbaseS3ClientWithTransactions.cs # Enhanced with transactions
+│       └── CouchbaseS3Implementation.cs        # S3 implementation
 ├── tests/
 │   └── AWSSDK.Extensions.Tests/
-│       ├── CouchbaseS3ClientTests.cs
-│       └── CouchbaseS3ClientWithTransactionsTests.cs
+│       └── CouchbaseS3ClientTests.cs
 └── .github/
     └── workflows/
         └── pr-tests.yml                         # CI/CD pipeline
