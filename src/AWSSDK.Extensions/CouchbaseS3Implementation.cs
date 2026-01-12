@@ -930,16 +930,16 @@ public class CouchbaseS3Client : IAmazonS3
 
     #region Helper Methods
 
-    private List<Document> GetObjectsInBucket(string bucketName)
+    private List<string> GetObjectsInBucket(string bucketName)
     {
-        var query = QueryBuilder.Select(SelectResult.All())
+        var query = QueryBuilder.Select(SelectResult.Property("key"))
             .From(DataSource.Database(_database))
             .Where(
                 Expression.Property("type").EqualTo(Expression.String("object"))
                 .And(Expression.Property("bucketName").EqualTo(Expression.String(bucketName)))
             );
 
-        return query.Execute().Select(r => r.GetDictionary(0)).Cast<Document>().ToList();
+        return query.Execute().Select(r => r.GetString("key")).Where(k => k != null).ToList()!;
     }
 
     #endregion
