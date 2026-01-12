@@ -459,6 +459,17 @@ public class CouchbaseS3Client : IAmazonS3
     {
         return await Task.Run(() =>
         {
+            // Check if bucket exists first
+            var bucketDoc = _database.GetDocument($"bucket::{request.BucketName}");
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
             // If a specific version ID is requested, retrieve that version
             if (!string.IsNullOrEmpty(request.VersionId))
             {
@@ -768,6 +779,15 @@ public class CouchbaseS3Client : IAmazonS3
         {
             // Check if versioning is enabled on the bucket
             var bucketDoc = _database.GetDocument($"bucket::{request.BucketName}");
+            if (bucketDoc == null)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
             var versioningStatus = bucketDoc?.GetString("versioningStatus");
             var isVersioningEnabled = versioningStatus == "Enabled";
             var isVersioningSuspended = versioningStatus == "Suspended";

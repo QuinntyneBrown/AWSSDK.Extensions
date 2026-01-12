@@ -185,7 +185,7 @@ public class ErrorHandlingPartialFailuresAcceptanceTests : IDisposable
             Key = "protected.txt",
             Retention = new ObjectLockRetention
             {
-                Mode = ObjectLockRetentionMode.COMPLIANCE,
+                Mode = ObjectLockRetentionMode.Compliance,
                 RetainUntilDate = DateTime.UtcNow.AddYears(1)
             }
         });
@@ -284,7 +284,7 @@ public class ErrorHandlingPartialFailuresAcceptanceTests : IDisposable
             Key = "protected.txt",
             Retention = new ObjectLockRetention
             {
-                Mode = ObjectLockRetentionMode.GOVERNANCE,
+                Mode = ObjectLockRetentionMode.Governance,
                 RetainUntilDate = DateTime.UtcNow.AddDays(30)
             }
         });

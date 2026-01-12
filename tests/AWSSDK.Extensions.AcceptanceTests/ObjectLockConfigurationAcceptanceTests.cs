@@ -65,7 +65,7 @@ public class ObjectLockConfigurationAcceptanceTests : IDisposable
                 {
                     DefaultRetention = new DefaultRetention
                     {
-                        Mode = ObjectLockRetentionMode.GOVERNANCE,
+                        Mode = ObjectLockRetentionMode.Governance,
                         Days = 30
                     }
                 }
@@ -113,7 +113,7 @@ public class ObjectLockConfigurationAcceptanceTests : IDisposable
                 {
                     DefaultRetention = new DefaultRetention
                     {
-                        Mode = ObjectLockRetentionMode.COMPLIANCE,
+                        Mode = ObjectLockRetentionMode.Compliance,
                         Years = 7
                     }
                 }
@@ -158,7 +158,7 @@ public class ObjectLockConfigurationAcceptanceTests : IDisposable
                 {
                     DefaultRetention = new DefaultRetention
                     {
-                        Mode = ObjectLockRetentionMode.GOVERNANCE,
+                        Mode = ObjectLockRetentionMode.Governance,
                         Days = 30
                     }
                 }
@@ -238,7 +238,7 @@ public class ObjectLockConfigurationAcceptanceTests : IDisposable
                 {
                     DefaultRetention = new DefaultRetention
                     {
-                        Mode = ObjectLockRetentionMode.GOVERNANCE,
+                        Mode = ObjectLockRetentionMode.Governance,
                         Days = 30
                     }
                 }
@@ -351,7 +351,7 @@ public class ObjectLockConfigurationAcceptanceTests : IDisposable
                 {
                     DefaultRetention = new DefaultRetention
                     {
-                        Mode = ObjectLockRetentionMode.GOVERNANCE,
+                        Mode = ObjectLockRetentionMode.Governance,
                         Days = 30
                     }
                 }
@@ -369,7 +369,7 @@ public class ObjectLockConfigurationAcceptanceTests : IDisposable
                 {
                     DefaultRetention = new DefaultRetention
                     {
-                        Mode = ObjectLockRetentionMode.COMPLIANCE,
+                        Mode = ObjectLockRetentionMode.Compliance,
                         Years = 5
                     }
                 }

@@ -170,7 +170,7 @@ public class ObjectLockLegalHoldAcceptanceTests : IDisposable
             Key = "file.txt",
             Retention = new ObjectLockRetention
             {
-                Mode = ObjectLockRetentionMode.GOVERNANCE,
+                Mode = ObjectLockRetentionMode.Governance,
                 RetainUntilDate = DateTime.UtcNow.AddDays(30)
             }
         });

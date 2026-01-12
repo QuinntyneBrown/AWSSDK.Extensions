@@ -68,7 +68,7 @@ public class ObjectLockRetentionAcceptanceTests : IDisposable
             Key = "file.txt",
             Retention = new ObjectLockRetention
             {
-                Mode = ObjectLockRetentionMode.GOVERNANCE,
+                Mode = ObjectLockRetentionMode.Governance,
                 RetainUntilDate = retainUntilDate
             }
         });
@@ -117,7 +117,7 @@ public class ObjectLockRetentionAcceptanceTests : IDisposable
             Key = "file.txt",
             Retention = new ObjectLockRetention
             {
-                Mode = ObjectLockRetentionMode.COMPLIANCE,
+                Mode = ObjectLockRetentionMode.Compliance,
                 RetainUntilDate = retainUntilDate
             }
         });
@@ -163,7 +163,7 @@ public class ObjectLockRetentionAcceptanceTests : IDisposable
             Key = "file.txt",
             Retention = new ObjectLockRetention
             {
-                Mode = ObjectLockRetentionMode.GOVERNANCE,
+                Mode = ObjectLockRetentionMode.Governance,
                 RetainUntilDate = initialRetainUntilDate
             }
         });
@@ -177,7 +177,7 @@ public class ObjectLockRetentionAcceptanceTests : IDisposable
             Key = "file.txt",
             Retention = new ObjectLockRetention
             {
-                Mode = ObjectLockRetentionMode.GOVERNANCE,
+                Mode = ObjectLockRetentionMode.Governance,
                 RetainUntilDate = extendedRetainUntilDate
             }
         });
@@ -223,7 +223,7 @@ public class ObjectLockRetentionAcceptanceTests : IDisposable
             Key = "file.txt",
             Retention = new ObjectLockRetention
             {
-                Mode = ObjectLockRetentionMode.GOVERNANCE,
+                Mode = ObjectLockRetentionMode.Governance,
                 RetainUntilDate = DateTime.UtcNow.AddDays(30)
             }
         });
@@ -264,7 +264,7 @@ public class ObjectLockRetentionAcceptanceTests : IDisposable
                 Key = "non-existent.txt",
                 Retention = new ObjectLockRetention
                 {
-                    Mode = ObjectLockRetentionMode.GOVERNANCE,
+                    Mode = ObjectLockRetentionMode.Governance,
                     RetainUntilDate = DateTime.UtcNow.AddDays(30)
                 }
             }));
@@ -306,7 +306,7 @@ public class ObjectLockRetentionAcceptanceTests : IDisposable
             Key = "file.txt",
             Retention = new ObjectLockRetention
             {
-                Mode = ObjectLockRetentionMode.GOVERNANCE,
+                Mode = ObjectLockRetentionMode.Governance,
                 RetainUntilDate = retainUntilDate
             }
         });
@@ -404,7 +404,7 @@ public class ObjectLockRetentionAcceptanceTests : IDisposable
             Key = "gov-file.txt",
             Retention = new ObjectLockRetention
             {
-                Mode = ObjectLockRetentionMode.GOVERNANCE,
+                Mode = ObjectLockRetentionMode.Governance,
                 RetainUntilDate = DateTime.UtcNow.AddDays(30)
             }
         });
@@ -417,7 +417,7 @@ public class ObjectLockRetentionAcceptanceTests : IDisposable
             Key = "comp-file.txt",
             Retention = new ObjectLockRetention
             {
-                Mode = ObjectLockRetentionMode.COMPLIANCE,
+                Mode = ObjectLockRetentionMode.Compliance,
                 RetainUntilDate = DateTime.UtcNow.AddDays(30)
             }
         });
