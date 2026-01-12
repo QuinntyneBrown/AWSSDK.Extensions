@@ -239,6 +239,7 @@ public class CouchbaseS3Client : IAmazonS3
             // Check if versioning is enabled on the bucket
             var versioningStatus = bucketDoc.GetString("versioningStatus");
             var isVersioningEnabled = versioningStatus == "Enabled";
+            var isVersioningSuspended = versioningStatus == "Suspended";
             string? versionId = null;
 
             var objectId = $"object::{request.BucketName}::{request.Key}";
@@ -266,11 +267,18 @@ public class CouchbaseS3Client : IAmazonS3
                     versionDoc.SetLong("size", existingDoc.GetLong("size"));
                     versionDoc.SetString("etag", existingDoc.GetString("etag"));
 
-                    // Copy the blob content
+                    // Copy the blob content - must read bytes and create new blob
                     var existingBlob = existingDoc.GetBlob("content");
                     if (existingBlob != null)
                     {
-                        versionDoc.SetBlob("content", existingBlob);
+                        byte[] blobContent;
+                        using (var ms = new MemoryStream())
+                        {
+                            existingBlob.ContentStream?.CopyTo(ms);
+                            blobContent = ms.ToArray();
+                        }
+                        var newBlob = new Blob(existingBlob.ContentType ?? "application/octet-stream", blobContent);
+                        versionDoc.SetBlob("content", newBlob);
                     }
 
                     // Copy metadata
@@ -293,6 +301,65 @@ public class CouchbaseS3Client : IAmazonS3
                 // Generate a new version ID for the new object
                 versionId = GenerateVersionId();
             }
+            else if (isVersioningSuspended)
+            {
+                // When versioning is suspended, archive the existing versioned object (if it has a real version ID)
+                var existingDoc = _database.GetDocument(objectId);
+                if (existingDoc != null)
+                {
+                    var existingVersionId = existingDoc.GetString("versionId");
+
+                    // Only archive if the existing object has a non-null version ID (was created during versioning enabled)
+                    if (!string.IsNullOrEmpty(existingVersionId) && existingVersionId != "null")
+                    {
+                        var versionDocId = $"version::{request.BucketName}::{request.Key}::{existingVersionId}";
+
+                        // Create a copy of the existing document as a version
+                        var versionDoc = new MutableDocument(versionDocId);
+                        versionDoc.SetString("type", "version");
+                        versionDoc.SetString("bucketName", existingDoc.GetString("bucketName"));
+                        versionDoc.SetString("key", existingDoc.GetString("key"));
+                        versionDoc.SetString("contentType", existingDoc.GetString("contentType"));
+                        versionDoc.SetDate("lastModified", existingDoc.GetDate("lastModified"));
+                        versionDoc.SetString("versionId", existingVersionId);
+                        versionDoc.SetBoolean("isLatest", false);
+                        versionDoc.SetBoolean("isDeleteMarker", false);
+                        versionDoc.SetLong("size", existingDoc.GetLong("size"));
+                        versionDoc.SetString("etag", existingDoc.GetString("etag"));
+
+                        // Copy the blob content - must read bytes and create new blob
+                        var existingBlob = existingDoc.GetBlob("content");
+                        if (existingBlob != null)
+                        {
+                            byte[] blobContent;
+                            using (var ms = new MemoryStream())
+                            {
+                                existingBlob.ContentStream?.CopyTo(ms);
+                                blobContent = ms.ToArray();
+                            }
+                            var newBlob = new Blob(existingBlob.ContentType ?? "application/octet-stream", blobContent);
+                            versionDoc.SetBlob("content", newBlob);
+                        }
+
+                        var existingMetadata = existingDoc.GetDictionary("metadata");
+                        if (existingMetadata != null)
+                        {
+                            versionDoc.SetDictionary("metadata", existingMetadata);
+                        }
+
+                        var existingPrefix = existingDoc.GetString("prefix");
+                        if (!string.IsNullOrEmpty(existingPrefix))
+                        {
+                            versionDoc.SetString("prefix", existingPrefix);
+                        }
+
+                        _database.Save(versionDoc);
+                    }
+                }
+
+                // New objects in suspended state get null version ID
+                versionId = "null";
+            }
 
             var doc = new MutableDocument(objectId);
 
@@ -303,8 +370,8 @@ public class CouchbaseS3Client : IAmazonS3
             doc.SetString("contentType", request.ContentType ?? "application/octet-stream");
             doc.SetDate("lastModified", DateTimeOffset.UtcNow);
 
-            // Store version ID if versioning is enabled
-            if (isVersioningEnabled && versionId != null)
+            // Store version ID if versioning is enabled or suspended
+            if ((isVersioningEnabled || isVersioningSuspended) && versionId != null)
             {
                 doc.SetString("versionId", versionId);
             }
@@ -401,6 +468,67 @@ public class CouchbaseS3Client : IAmazonS3
             // If a specific version ID is requested, retrieve that version
             if (!string.IsNullOrEmpty(request.VersionId))
             {
+                // Handle "null" version ID - refers to null version in non-versioned/suspended bucket
+                if (request.VersionId == "null")
+                {
+                    var nullObjId = $"object::{request.BucketName}::{request.Key}";
+                    var nullVersionDoc = _database.GetDocument(nullObjId);
+                    if (nullVersionDoc != null)
+                    {
+                        var blob = nullVersionDoc.GetBlob("content");
+                        var response = new GetObjectResponse
+                        {
+                            BucketName = request.BucketName,
+                            Key = request.Key,
+                            ContentLength = nullVersionDoc.GetLong("size"),
+                            ETag = nullVersionDoc.GetString("etag"),
+                            LastModified = nullVersionDoc.GetDate("lastModified").UtcDateTime,
+                            VersionId = nullVersionDoc.GetString("versionId") ?? "null",
+                            HttpStatusCode = HttpStatusCode.OK
+                        };
+
+                        response.Headers.ContentType = nullVersionDoc.GetString("contentType");
+
+                        if (blob != null)
+                        {
+                            response.ResponseStream = blob.ContentStream;
+                        }
+                        else
+                        {
+                            response.ResponseStream = new MemoryStream();
+                        }
+
+                        var metadataDict = nullVersionDoc.GetDictionary("metadata");
+                        if (metadataDict != null)
+                        {
+                            foreach (var key in metadataDict.Keys)
+                            {
+                                response.Metadata[key] = metadataDict.GetString(key);
+                            }
+                        }
+
+                        return response;
+                    }
+
+                    throw new AmazonS3Exception("The specified version does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchVersion"
+                    };
+                }
+
+                // Check if the version ID refers to a delete marker - not allowed to GET a delete marker
+                var deleteMarkerDocId = $"deletemarker::{request.BucketName}::{request.Key}::{request.VersionId}";
+                var deleteMarkerDoc = _database.GetDocument(deleteMarkerDocId);
+                if (deleteMarkerDoc != null)
+                {
+                    throw new AmazonS3Exception("A Delete Marker cannot be retrieved using GET")
+                    {
+                        StatusCode = HttpStatusCode.MethodNotAllowed,
+                        ErrorCode = "MethodNotAllowed"
+                    };
+                }
+
                 // First check if it's an archived version
                 var versionDocId = $"version::{request.BucketName}::{request.Key}::{request.VersionId}";
                 var versionDoc = _database.GetDocument(versionDocId);
@@ -648,6 +776,7 @@ public class CouchbaseS3Client : IAmazonS3
             var bucketDoc = _database.GetDocument($"bucket::{request.BucketName}");
             var versioningStatus = bucketDoc?.GetString("versioningStatus");
             var isVersioningEnabled = versioningStatus == "Enabled";
+            var isVersioningSuspended = versioningStatus == "Suspended";
 
             // If a specific version ID is provided, delete that version document
             if (!string.IsNullOrEmpty(request.VersionId))
@@ -721,10 +850,18 @@ public class CouchbaseS3Client : IAmazonS3
                     versionDoc.SetLong("size", doc.GetLong("size"));
                     versionDoc.SetString("etag", doc.GetString("etag"));
 
+                    // Copy the blob content - must read bytes and create new blob
                     var existingBlob = doc.GetBlob("content");
                     if (existingBlob != null)
                     {
-                        versionDoc.SetBlob("content", existingBlob);
+                        byte[] blobContent;
+                        using (var ms = new MemoryStream())
+                        {
+                            existingBlob.ContentStream?.CopyTo(ms);
+                            blobContent = ms.ToArray();
+                        }
+                        var newBlob = new Blob(existingBlob.ContentType ?? "application/octet-stream", blobContent);
+                        versionDoc.SetBlob("content", newBlob);
                     }
 
                     var existingMetadata = doc.GetDictionary("metadata");
@@ -745,6 +882,36 @@ public class CouchbaseS3Client : IAmazonS3
                     _database.Delete(doc);
                 }
 
+                // Update any existing delete markers to set isLatest = false
+                var existingDeleteMarkersQuery = QueryBuilder.Select(SelectResult.All())
+                    .From(DataSource.Database(_database))
+                    .Where(
+                        Expression.Property("type").EqualTo(Expression.String("deletemarker"))
+                        .And(Expression.Property("bucketName").EqualTo(Expression.String(request.BucketName)))
+                        .And(Expression.Property("key").EqualTo(Expression.String(request.Key)))
+                        .And(Expression.Property("isLatest").EqualTo(Expression.Boolean(true)))
+                    );
+
+                foreach (var result in existingDeleteMarkersQuery.Execute())
+                {
+                    var dict = result.GetDictionary(0);
+                    if (dict != null)
+                    {
+                        var existingDmVersionId = dict.GetString("versionId");
+                        if (!string.IsNullOrEmpty(existingDmVersionId))
+                        {
+                            var existingDmDocId = $"deletemarker::{request.BucketName}::{request.Key}::{existingDmVersionId}";
+                            var existingDmDoc = _database.GetDocument(existingDmDocId);
+                            if (existingDmDoc != null)
+                            {
+                                var updatedDmDoc = existingDmDoc.ToMutable();
+                                updatedDmDoc.SetBoolean("isLatest", false);
+                                _database.Save(updatedDmDoc);
+                            }
+                        }
+                    }
+                }
+
                 // Create a delete marker
                 var deleteMarkerVersionId = GenerateVersionId();
                 var deleteMarkerDocId = $"deletemarker::{request.BucketName}::{request.Key}::{deleteMarkerVersionId}";
@@ -763,6 +930,90 @@ public class CouchbaseS3Client : IAmazonS3
                 {
                     DeleteMarker = "true",
                     VersionId = deleteMarkerVersionId,
+                    HttpStatusCode = HttpStatusCode.NoContent
+                };
+            }
+            else if (isVersioningSuspended)
+            {
+                // Versioning is suspended
+                // If the current object has a real version ID, archive it before deleting
+                if (doc != null)
+                {
+                    var existingVersionId = doc.GetString("versionId");
+
+                    // Only archive if the existing object has a non-null version ID
+                    if (!string.IsNullOrEmpty(existingVersionId) && existingVersionId != "null")
+                    {
+                        var versionDocId = $"version::{request.BucketName}::{request.Key}::{existingVersionId}";
+
+                        var versionDoc = new MutableDocument(versionDocId);
+                        versionDoc.SetString("type", "version");
+                        versionDoc.SetString("bucketName", doc.GetString("bucketName"));
+                        versionDoc.SetString("key", doc.GetString("key"));
+                        versionDoc.SetString("contentType", doc.GetString("contentType"));
+                        versionDoc.SetDate("lastModified", doc.GetDate("lastModified"));
+                        versionDoc.SetString("versionId", existingVersionId);
+                        versionDoc.SetBoolean("isLatest", false);
+                        versionDoc.SetBoolean("isDeleteMarker", false);
+                        versionDoc.SetLong("size", doc.GetLong("size"));
+                        versionDoc.SetString("etag", doc.GetString("etag"));
+
+                        // Copy the blob content
+                        var existingBlob = doc.GetBlob("content");
+                        if (existingBlob != null)
+                        {
+                            byte[] blobContent;
+                            using (var ms = new MemoryStream())
+                            {
+                                existingBlob.ContentStream?.CopyTo(ms);
+                                blobContent = ms.ToArray();
+                            }
+                            var newBlob = new Blob(existingBlob.ContentType ?? "application/octet-stream", blobContent);
+                            versionDoc.SetBlob("content", newBlob);
+                        }
+
+                        var existingMetadata = doc.GetDictionary("metadata");
+                        if (existingMetadata != null)
+                        {
+                            versionDoc.SetDictionary("metadata", existingMetadata);
+                        }
+
+                        var existingPrefix = doc.GetString("prefix");
+                        if (!string.IsNullOrEmpty(existingPrefix))
+                        {
+                            versionDoc.SetString("prefix", existingPrefix);
+                        }
+
+                        _database.Save(versionDoc);
+                    }
+
+                    _database.Delete(doc);
+                }
+
+                // Delete any existing null delete marker
+                var existingNullDmDocId = $"deletemarker::{request.BucketName}::{request.Key}::null";
+                var existingNullDmDoc = _database.GetDocument(existingNullDmDocId);
+                if (existingNullDmDoc != null)
+                {
+                    _database.Delete(existingNullDmDoc);
+                }
+
+                // Create a delete marker with null versionId
+                var nullDmDoc = new MutableDocument(existingNullDmDocId);
+                nullDmDoc.SetString("type", "deletemarker");
+                nullDmDoc.SetString("bucketName", request.BucketName);
+                nullDmDoc.SetString("key", request.Key);
+                nullDmDoc.SetString("versionId", "null");
+                nullDmDoc.SetDate("lastModified", DateTimeOffset.UtcNow);
+                nullDmDoc.SetBoolean("isLatest", true);
+                nullDmDoc.SetBoolean("isDeleteMarker", true);
+
+                _database.Save(nullDmDoc);
+
+                return new DeleteObjectResponse
+                {
+                    DeleteMarker = "true",
+                    VersionId = "null",
                     HttpStatusCode = HttpStatusCode.NoContent
                 };
             }
@@ -994,7 +1245,19 @@ public class CouchbaseS3Client : IAmazonS3
             Document? sourceDoc;
             if (!string.IsNullOrEmpty(request.SourceVersionId))
             {
+                // First check archived versions
                 sourceDoc = _database.GetDocument($"version::{request.SourceBucket}::{request.SourceKey}::{request.SourceVersionId}");
+
+                // If not found, check if the version ID matches the current object's version
+                if (sourceDoc == null)
+                {
+                    var currentDoc = _database.GetDocument($"object::{request.SourceBucket}::{request.SourceKey}");
+                    if (currentDoc != null && currentDoc.GetString("versionId") == request.SourceVersionId)
+                    {
+                        sourceDoc = currentDoc;
+                    }
+                }
+
                 if (sourceDoc == null)
                 {
                     throw new AmazonS3Exception("The specified version does not exist")
@@ -1017,8 +1280,69 @@ public class CouchbaseS3Client : IAmazonS3
                 }
             }
 
+            // Check if versioning is enabled on the destination bucket
+            var destVersioningStatus = destBucketDoc.GetString("versioningStatus");
+            var isDestVersioningEnabled = destVersioningStatus == "Enabled";
+            string? newVersionId = null;
+
             // Create destination document
             var destObjectId = $"object::{request.DestinationBucket}::{request.DestinationKey}";
+
+            // If versioning is enabled, archive the existing destination object (if any)
+            if (isDestVersioningEnabled)
+            {
+                var existingDestDoc = _database.GetDocument(destObjectId);
+                if (existingDestDoc != null)
+                {
+                    // Archive the existing destination object
+                    var existingVersionId = existingDestDoc.GetString("versionId") ?? GenerateVersionId();
+                    var versionDocId = $"version::{request.DestinationBucket}::{request.DestinationKey}::{existingVersionId}";
+
+                    var versionDoc = new MutableDocument(versionDocId);
+                    versionDoc.SetString("type", "version");
+                    versionDoc.SetString("bucketName", existingDestDoc.GetString("bucketName"));
+                    versionDoc.SetString("key", existingDestDoc.GetString("key"));
+                    versionDoc.SetString("contentType", existingDestDoc.GetString("contentType"));
+                    versionDoc.SetDate("lastModified", existingDestDoc.GetDate("lastModified"));
+                    versionDoc.SetString("versionId", existingVersionId);
+                    versionDoc.SetBoolean("isLatest", false);
+                    versionDoc.SetBoolean("isDeleteMarker", false);
+                    versionDoc.SetLong("size", existingDestDoc.GetLong("size"));
+                    versionDoc.SetString("etag", existingDestDoc.GetString("etag"));
+
+                    // Copy the blob content - must read bytes and create new blob
+                    var existingBlob = existingDestDoc.GetBlob("content");
+                    if (existingBlob != null)
+                    {
+                        byte[] blobContent;
+                        using (var ms = new MemoryStream())
+                        {
+                            existingBlob.ContentStream?.CopyTo(ms);
+                            blobContent = ms.ToArray();
+                        }
+                        var newBlob = new Blob(existingBlob.ContentType ?? "application/octet-stream", blobContent);
+                        versionDoc.SetBlob("content", newBlob);
+                    }
+
+                    var existingMetadata = existingDestDoc.GetDictionary("metadata");
+                    if (existingMetadata != null)
+                    {
+                        versionDoc.SetDictionary("metadata", existingMetadata);
+                    }
+
+                    var existingPrefix = existingDestDoc.GetString("prefix");
+                    if (!string.IsNullOrEmpty(existingPrefix))
+                    {
+                        versionDoc.SetString("prefix", existingPrefix);
+                    }
+
+                    _database.Save(versionDoc);
+                }
+
+                // Generate a new version ID for the copied object
+                newVersionId = GenerateVersionId();
+            }
+
             var destDoc = new MutableDocument(destObjectId);
 
             // Copy core properties
@@ -1028,6 +1352,12 @@ public class CouchbaseS3Client : IAmazonS3
             destDoc.SetString("contentType", sourceDoc.GetString("contentType"));
             destDoc.SetDate("lastModified", DateTimeOffset.UtcNow);
             destDoc.SetLong("size", sourceDoc.GetLong("size"));
+
+            // Store version ID if versioning is enabled
+            if (isDestVersioningEnabled && newVersionId != null)
+            {
+                destDoc.SetString("versionId", newVersionId);
+            }
 
             // Extract prefix for efficient prefix searches
             var lastSlash = request.DestinationKey.LastIndexOf('/');
@@ -1109,6 +1439,7 @@ public class CouchbaseS3Client : IAmazonS3
             {
                 ETag = etag,
                 SourceVersionId = request.SourceVersionId,
+                VersionId = newVersionId,
                 HttpStatusCode = HttpStatusCode.OK
             };
             copyResponse.LastModified = destDoc.GetDate("lastModified").UtcDateTime.ToString("o");
@@ -1156,8 +1487,36 @@ public class CouchbaseS3Client : IAmazonS3
             // If versionId is specified, look for the versioned document
             if (!string.IsNullOrEmpty(request.VersionId))
             {
+                // Check if it's a delete marker by version ID
+                var deleteMarkerDocId = $"deletemarker::{request.BucketName}::{request.Key}::{request.VersionId}";
+                var deleteMarkerDoc = _database.GetDocument(deleteMarkerDocId);
+                if (deleteMarkerDoc != null)
+                {
+                    // Return metadata for delete marker
+                    var dmResponse = new GetObjectMetadataResponse
+                    {
+                        LastModified = deleteMarkerDoc.GetDate("lastModified").UtcDateTime,
+                        DeleteMarker = "true",
+                        VersionId = deleteMarkerDoc.GetString("versionId"),
+                        HttpStatusCode = HttpStatusCode.OK
+                    };
+                    return dmResponse;
+                }
+
+                // Check archived versions
                 var versionDocId = $"version::{request.BucketName}::{request.Key}::{request.VersionId}";
                 doc = _database.GetDocument(versionDocId);
+
+                // If not found, check if the version ID matches the current object's version
+                if (doc == null)
+                {
+                    var objectId = $"object::{request.BucketName}::{request.Key}";
+                    var currentDoc = _database.GetDocument(objectId);
+                    if (currentDoc != null && currentDoc.GetString("versionId") == request.VersionId)
+                    {
+                        doc = currentDoc;
+                    }
+                }
 
                 if (doc == null)
                 {
@@ -1175,6 +1534,26 @@ public class CouchbaseS3Client : IAmazonS3
 
                 if (doc == null)
                 {
+                    // Check if there's a delete marker as the current version
+                    var deleteMarkerQuery = QueryBuilder.Select(SelectResult.All())
+                        .From(DataSource.Database(_database))
+                        .Where(
+                            Expression.Property("type").EqualTo(Expression.String("deletemarker"))
+                            .And(Expression.Property("bucketName").EqualTo(Expression.String(request.BucketName)))
+                            .And(Expression.Property("key").EqualTo(Expression.String(request.Key)))
+                            .And(Expression.Property("isLatest").EqualTo(Expression.Boolean(true)))
+                        );
+
+                    foreach (var result in deleteMarkerQuery.Execute())
+                    {
+                        // There's a delete marker as current version, object is "deleted"
+                        throw new AmazonS3Exception("Object does not exist")
+                        {
+                            StatusCode = HttpStatusCode.NotFound,
+                            ErrorCode = "NoSuchKey"
+                        };
+                    }
+
                     throw new AmazonS3Exception("Object does not exist")
                     {
                         StatusCode = HttpStatusCode.NotFound,
@@ -2905,8 +3284,22 @@ public class CouchbaseS3Client : IAmazonS3
                 };
             }
 
+            // Validate ExpectedBucketOwner if specified
+            if (!string.IsNullOrEmpty(request.ExpectedBucketOwner))
+            {
+                var actualOwner = bucketDoc.GetString("ownerId") ?? "123456789012"; // Default owner ID
+                if (request.ExpectedBucketOwner != actualOwner)
+                {
+                    throw new AmazonS3Exception("Access Denied")
+                    {
+                        StatusCode = HttpStatusCode.Forbidden,
+                        ErrorCode = "AccessDenied"
+                    };
+                }
+            }
+
             var versioningStatus = bucketDoc.GetString("versioningStatus");
-            var status = VersionStatus.Off;
+            VersionStatus? status = null;
 
             if (versioningStatus == "Enabled")
             {
@@ -2916,10 +3309,17 @@ public class CouchbaseS3Client : IAmazonS3
             {
                 status = VersionStatus.Suspended;
             }
+            // When versioningStatus is null/empty (never configured), status remains null
+
+            var mfaDeleteEnabled = bucketDoc.GetBoolean("mfaDeleteEnabled");
 
             return new GetBucketVersioningResponse
             {
-                VersioningConfig = new S3BucketVersioningConfig { Status = status },
+                VersioningConfig = new S3BucketVersioningConfig
+                {
+                    Status = status,
+                    EnableMfaDelete = mfaDeleteEnabled
+                },
                 HttpStatusCode = HttpStatusCode.OK
             };
         }, cancellationToken);
@@ -4362,6 +4762,20 @@ public class CouchbaseS3Client : IAmazonS3
                 };
             }
 
+            // Validate ExpectedBucketOwner if specified
+            if (!string.IsNullOrEmpty(request.ExpectedBucketOwner))
+            {
+                var actualOwner = bucketDoc.GetString("ownerId") ?? "123456789012"; // Default owner ID
+                if (request.ExpectedBucketOwner != actualOwner)
+                {
+                    throw new AmazonS3Exception("Access Denied")
+                    {
+                        StatusCode = HttpStatusCode.Forbidden,
+                        ErrorCode = "AccessDenied"
+                    };
+                }
+            }
+
             var currentStatus = bucketDoc.GetString("versioningStatus");
             var newStatus = request.VersioningConfig?.Status?.Value;
 
@@ -4383,6 +4797,16 @@ public class CouchbaseS3Client : IAmazonS3
             // Update the bucket document with versioning status
             var mutableDoc = bucketDoc.ToMutable();
             mutableDoc.SetString("versioningStatus", newStatus ?? "Off");
+
+            // Store MFA Delete setting if provided
+            if (request.VersioningConfig?.EnableMfaDelete == true)
+            {
+                mutableDoc.SetBoolean("mfaDeleteEnabled", true);
+            }
+            else if (request.VersioningConfig != null)
+            {
+                mutableDoc.SetBoolean("mfaDeleteEnabled", false);
+            }
 
             _database.Save(mutableDoc);
 
