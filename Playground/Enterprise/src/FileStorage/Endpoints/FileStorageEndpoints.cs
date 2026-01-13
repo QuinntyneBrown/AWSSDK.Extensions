@@ -69,11 +69,6 @@ public static class FileStorageEndpoints
         IStorageService storageService,
         CancellationToken cancellationToken)
     {
-        if (request.ContentLength == 0)
-        {
-            return Results.BadRequest("No file content provided");
-        }
-
         var contentType = request.ContentType ?? "application/octet-stream";
         var result = await storageService.SaveFileAsync(
             bucketName,

@@ -191,19 +191,6 @@ public class StorageService : IStorageService
             });
         }
 
-        foreach (var marker in response.DeleteMarkers.Where(m => m.Key == key))
-        {
-            versions.Add(new FileVersion
-            {
-                VersionId = marker.VersionId,
-                Key = marker.Key,
-                IsLatest = marker.IsLatest,
-                LastModified = marker.LastModified,
-                Size = 0,
-                IsDeleteMarker = true
-            });
-        }
-
         return versions.OrderByDescending(v => v.LastModified).ToList();
     }
 
