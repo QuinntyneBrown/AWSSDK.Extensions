@@ -1,0 +1,41 @@
+name: Enterprise File Storage Tests
+
+on:
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'Playground/Enterprise/**'
+  push:
+    branches: [ main, master, 'claude/**' ]
+    paths:
+      - 'Playground/Enterprise/**'
+
+jobs:
+  test:
+    name: Build and Test Enterprise
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore Playground/Enterprise/Enterprise.sln
+
+    - name: Build
+      run: dotnet build Playground/Enterprise/Enterprise.sln --no-restore --configuration Release
+
+    - name: Run tests
+      run: dotnet test Playground/Enterprise/Enterprise.sln --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=enterprise-test-results.trx"
+
+    - name: Publish test results
+      uses: dorny/test-reporter@v1
+      if: always()
+      with:
+        name: Enterprise Test Results
+        path: '**/enterprise-test-results.trx'
+        reporter: dotnet-trx
