@@ -69,7 +69,7 @@ Open your browser to `http://localhost:5000` to access the Swagger UI for intera
 | GET | `/api/files/{bucketName}/{*key}` | Download a file |
 | GET | `/api/files/{bucketName}` | List files in a bucket |
 | DELETE | `/api/files/{bucketName}/{*key}` | Delete a file |
-| GET | `/api/files/{bucketName}/{key}/versions` | List file versions |
+| GET | `/api/files/versions/{bucketName}/{*key}` | List file versions |
 
 ### Query Parameters
 
@@ -145,7 +145,7 @@ curl -X DELETE "http://localhost:5000/api/files/my-bucket/hello.txt?versionId=ab
 ### List File Versions
 
 ```bash
-curl http://localhost:5000/api/files/my-bucket/hello.txt/versions
+curl http://localhost:5000/api/files/versions/my-bucket/hello.txt
 ```
 
 ## IStorageService Interface

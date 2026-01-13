@@ -20,6 +20,11 @@ public static class FileStorageEndpoints
             .WithName("EnableVersioning")
             .WithDescription("Enables versioning on a bucket");
 
+        // Versioning operations - must be defined before catch-all routes
+        group.MapGet("/versions/{bucketName}/{*key}", GetFileVersions)
+            .WithName("GetFileVersions")
+            .WithDescription("Lists all versions of a file");
+
         // File operations
         group.MapPost("/{bucketName}/{*key}", UploadFile)
             .WithName("UploadFile")
@@ -37,11 +42,6 @@ public static class FileStorageEndpoints
         group.MapDelete("/{bucketName}/{*key}", DeleteFile)
             .WithName("DeleteFile")
             .WithDescription("Deletes a file from storage");
-
-        // Versioning operations
-        group.MapGet("/{bucketName}/{key}/versions", GetFileVersions)
-            .WithName("GetFileVersions")
-            .WithDescription("Lists all versions of a file");
     }
 
     private static async Task<IResult> CreateBucket(

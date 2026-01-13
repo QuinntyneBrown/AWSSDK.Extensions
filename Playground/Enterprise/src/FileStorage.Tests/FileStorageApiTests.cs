@@ -317,7 +317,7 @@ public class FileStorageApiTests
             new StringContent("Version 3", Encoding.UTF8, "text/plain"));
 
         // Act
-        var response = await _client.GetAsync("/api/files/versions-bucket/multi-version.txt/versions");
+        var response = await _client.GetAsync("/api/files/versions/versions-bucket/multi-version.txt");
 
         // Assert
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
@@ -339,7 +339,7 @@ public class FileStorageApiTests
             new StringContent("New", Encoding.UTF8, "text/plain"));
 
         // Act
-        var response = await _client.GetAsync("/api/files/latest-bucket/latest.txt/versions");
+        var response = await _client.GetAsync("/api/files/versions/latest-bucket/latest.txt");
 
         // Assert
         var versions = await response.Content.ReadFromJsonAsync<List<FileVersion>>();
