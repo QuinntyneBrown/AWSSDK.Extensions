@@ -1,0 +1,21 @@
+.photo-dialog {
+  &__title {
+    margin: 0;
+  }
+
+  &__content {
+    display: flex;
+    justify-content: center;
+    padding: var(--spacing-md);
+  }
+
+  &__image {
+    max-width: 100%;
+    max-height: 70vh;
+    object-fit: contain;
+  }
+
+  &__actions {
+    padding: var(--spacing-md);
+  }
+}

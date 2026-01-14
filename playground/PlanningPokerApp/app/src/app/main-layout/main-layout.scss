@@ -1,0 +1,13 @@
+.main-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+
+  &__content {
+    flex: 1;
+    padding: var(--spacing-lg);
+    max-width: 1000px;
+    margin: 0 auto;
+    width: 100%;
+  }
+}

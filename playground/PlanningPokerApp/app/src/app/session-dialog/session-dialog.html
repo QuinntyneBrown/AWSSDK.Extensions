@@ -1,0 +1,15 @@
+<h2 mat-dialog-title class="session-dialog__title">Create New Session</h2>
+
+<mat-dialog-content class="session-dialog__content">
+  <mat-form-field appearance="outline" class="session-dialog__field">
+    <mat-label>Session Name</mat-label>
+    <input matInput [(ngModel)]="sessionName" placeholder="Enter session name">
+  </mat-form-field>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="session-dialog__actions">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="onCreate()" [disabled]="!sessionName.trim()">
+    Create
+  </button>
+</mat-dialog-actions>

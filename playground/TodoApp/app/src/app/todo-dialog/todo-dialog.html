@@ -1,0 +1,22 @@
+<h2 mat-dialog-title class="todo-dialog__title">
+  {{ data.mode === 'create' ? 'Add New Task' : 'Edit Task' }}
+</h2>
+
+<mat-dialog-content class="todo-dialog__content">
+  <mat-form-field appearance="outline" class="todo-dialog__field">
+    <mat-label>Title</mat-label>
+    <input matInput [(ngModel)]="title" placeholder="Enter task title">
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="todo-dialog__field">
+    <mat-label>Description</mat-label>
+    <textarea matInput [(ngModel)]="description" placeholder="Enter task description" rows="3"></textarea>
+  </mat-form-field>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="todo-dialog__actions">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="onSave()" [disabled]="!title.trim()">
+    {{ data.mode === 'create' ? 'Add' : 'Save' }}
+  </button>
+</mat-dialog-actions>

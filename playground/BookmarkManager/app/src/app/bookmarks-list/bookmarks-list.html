@@ -1,0 +1,43 @@
+<div class="bookmarks-list">
+  <div class="bookmarks-list__header">
+    <h2 class="bookmarks-list__title">My Bookmarks</h2>
+    <div class="bookmarks-list__controls">
+      <mat-form-field appearance="outline" class="bookmarks-list__filter">
+        <mat-label>Filter by Category</mat-label>
+        <mat-select [value]="selectedCategory$ | async" (selectionChange)="onFilterChange($event.value)">
+          <mat-option value="">All Categories</mat-option>
+          @for (cat of categories$ | async; track cat) {
+            <mat-option [value]="cat">{{ cat }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <button mat-fab color="primary" (click)="openAddDialog()">
+        <mat-icon>add</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <mat-card class="bookmarks-list__card">
+    <mat-list>
+      @for (bookmark of bookmarks$ | async; track bookmark.id) {
+        <mat-list-item class="bookmarks-list__item" (click)="openUrl(bookmark.url)">
+          <mat-icon class="bookmarks-list__icon">link</mat-icon>
+          <div class="bookmarks-list__content">
+            <span class="bookmarks-list__item-title">{{ bookmark.title }}</span>
+            <span class="bookmarks-list__item-url">{{ bookmark.url }}</span>
+          </div>
+          <mat-chip-set class="bookmarks-list__category">
+            <mat-chip>{{ bookmark.category }}</mat-chip>
+          </mat-chip-set>
+          <button mat-icon-button color="warn" (click)="deleteBookmark(bookmark, $event)">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </mat-list-item>
+      } @empty {
+        <mat-list-item class="bookmarks-list__empty">
+          <span>No bookmarks yet. Click + to add one!</span>
+        </mat-list-item>
+      }
+    </mat-list>
+  </mat-card>
+</div>

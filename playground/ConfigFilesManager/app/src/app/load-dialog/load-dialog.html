@@ -1,0 +1,16 @@
+<h2 mat-dialog-title class="load-dialog__title">{{ data.config.name }}</h2>
+
+<mat-dialog-content class="load-dialog__content">
+  <div class="load-dialog__meta">
+    <span class="load-dialog__meta-item">Type: {{ data.config.fileType }}</span>
+    <span class="load-dialog__meta-item">Environment: {{ data.config.environment }}</span>
+  </div>
+  @if (data.config.description) {
+    <p class="load-dialog__description">{{ data.config.description }}</p>
+  }
+  <pre class="load-dialog__code">{{ data.content }}</pre>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="load-dialog__actions">
+  <button mat-button (click)="onClose()">Close</button>
+</mat-dialog-actions>

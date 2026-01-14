@@ -1,0 +1,39 @@
+<h2 mat-dialog-title class="document-dialog__title">Upload Document</h2>
+
+<mat-dialog-content class="document-dialog__content">
+  <div class="document-dialog__dropzone">
+    <input type="file" (change)="onFileSelected($event)" class="document-dialog__input" #fileInput>
+    <button mat-stroked-button (click)="fileInput.click()">
+      <mat-icon>cloud_upload</mat-icon>
+      Choose File
+    </button>
+    @if (selectedFile) {
+      <p class="document-dialog__filename">{{ selectedFile.name }}</p>
+    }
+  </div>
+
+  <div class="document-dialog__tags">
+    <mat-form-field appearance="outline" class="document-dialog__tag-input">
+      <mat-label>Add Tag</mat-label>
+      <input matInput [(ngModel)]="tagInput" (keyup.enter)="addTag()" placeholder="Press Enter to add">
+    </mat-form-field>
+
+    <mat-chip-set class="document-dialog__tag-list">
+      @for (tag of tags; track tag) {
+        <mat-chip (removed)="removeTag(tag)">
+          {{ tag }}
+          <button matChipRemove>
+            <mat-icon>cancel</mat-icon>
+          </button>
+        </mat-chip>
+      }
+    </mat-chip-set>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="document-dialog__actions">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="onUpload()" [disabled]="!selectedFile">
+    Upload
+  </button>
+</mat-dialog-actions>

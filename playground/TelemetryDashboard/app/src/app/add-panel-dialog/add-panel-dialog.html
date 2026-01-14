@@ -1,0 +1,34 @@
+<h2 mat-dialog-title class="add-panel-dialog__title">Add Dashboard Panel</h2>
+
+<mat-dialog-content class="add-panel-dialog__content">
+  <mat-form-field appearance="outline" class="add-panel-dialog__field">
+    <mat-label>Panel Title</mat-label>
+    <input matInput [(ngModel)]="title" placeholder="e.g., Engine Temperature">
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="add-panel-dialog__field">
+    <mat-label>Telemetry Point</mat-label>
+    <mat-select [(ngModel)]="telemetryPointId">
+      @for (point of data.points; track point.id) {
+        <mat-option [value]="point.id">{{ point.name }} ({{ point.category }})</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="add-panel-dialog__field">
+    <mat-label>Display Type</mat-label>
+    <mat-select [(ngModel)]="displayType">
+      @for (type of displayTypes; track type) {
+        <mat-option [value]="type">{{ type | titlecase }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="add-panel-dialog__actions">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="onCreate()"
+    [disabled]="!title.trim() || !telemetryPointId">
+    Add Panel
+  </button>
+</mat-dialog-actions>

@@ -1,0 +1,9 @@
+<h2 mat-dialog-title class="photo-dialog__title">{{ data.photo.name }}</h2>
+
+<mat-dialog-content class="photo-dialog__content">
+  <img [src]="data.photoUrl" [alt]="data.photo.name" class="photo-dialog__image">
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="photo-dialog__actions">
+  <button mat-button (click)="onClose()">Close</button>
+</mat-dialog-actions>
