@@ -1,0 +1,23 @@
+<div class="dashboard">
+  <div class="dashboard__header">
+    <h2 class="dashboard__title">Mission Control</h2>
+    <button mat-fab color="primary" (click)="openAddPanelDialog()">
+      <mat-icon>add</mat-icon>
+    </button>
+  </div>
+
+  <div class="dashboard__grid">
+    @for (item of panelsWithData$ | async; track item.panel.id) {
+      <app-telemetry-panel
+        [panel]="item.panel"
+        [point]="item.point"
+        (delete)="deletePanel(item.panel.id)">
+      </app-telemetry-panel>
+    } @empty {
+      <div class="dashboard__empty">
+        <mat-icon class="dashboard__empty-icon">dashboard</mat-icon>
+        <p>No telemetry panels. Click + to add one!</p>
+      </div>
+    }
+  </div>
+</div>

@@ -1,0 +1,60 @@
+<h2 mat-dialog-title class="asset-dialog__title">
+  {{ data.mode === 'create' ? 'Add Asset' : 'Edit Asset' }}
+</h2>
+
+<mat-dialog-content class="asset-dialog__content">
+  @if (data.mode === 'create') {
+    <mat-form-field appearance="outline" class="asset-dialog__field">
+      <mat-label>Name</mat-label>
+      <input matInput [(ngModel)]="name" placeholder="Asset name">
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="asset-dialog__field">
+      <mat-label>Category</mat-label>
+      <mat-select [(ngModel)]="category">
+        @for (cat of categories; track cat) {
+          <mat-option [value]="cat">{{ cat }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="asset-dialog__field">
+      <mat-label>Location</mat-label>
+      <input matInput [(ngModel)]="location" placeholder="e.g., Office, Warehouse">
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="asset-dialog__field">
+      <mat-label>Acquired Date</mat-label>
+      <input matInput [matDatepicker]="picker" [(ngModel)]="acquiredAt">
+      <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+      <mat-datepicker #picker></mat-datepicker>
+    </mat-form-field>
+  } @else {
+    <mat-form-field appearance="outline" class="asset-dialog__field">
+      <mat-label>Status</mat-label>
+      <mat-select [(ngModel)]="status">
+        @for (s of statuses; track s) {
+          <mat-option [value]="s">{{ s | titlecase }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="asset-dialog__field">
+      <mat-label>Location</mat-label>
+      <input matInput [(ngModel)]="location" placeholder="e.g., Office, Warehouse">
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="asset-dialog__field">
+      <mat-label>Assigned To</mat-label>
+      <input matInput [(ngModel)]="assignedTo" placeholder="Person or department">
+    </mat-form-field>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="asset-dialog__actions">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="onSave()"
+    [disabled]="data.mode === 'create' && !name.trim()">
+    Save
+  </button>
+</mat-dialog-actions>

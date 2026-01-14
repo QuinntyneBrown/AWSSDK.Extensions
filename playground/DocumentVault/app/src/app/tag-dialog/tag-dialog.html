@@ -1,0 +1,24 @@
+<h2 mat-dialog-title class="tag-dialog__title">Manage Tags</h2>
+
+<mat-dialog-content class="tag-dialog__content">
+  <mat-form-field appearance="outline" class="tag-dialog__input">
+    <mat-label>Add Tag</mat-label>
+    <input matInput [(ngModel)]="tagInput" (keyup.enter)="addTag()" placeholder="Press Enter to add">
+  </mat-form-field>
+
+  <mat-chip-set class="tag-dialog__list">
+    @for (tag of tags; track tag) {
+      <mat-chip (removed)="removeTag(tag)">
+        {{ tag }}
+        <button matChipRemove>
+          <mat-icon>cancel</mat-icon>
+        </button>
+      </mat-chip>
+    }
+  </mat-chip-set>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="tag-dialog__actions">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="onSave()">Save</button>
+</mat-dialog-actions>

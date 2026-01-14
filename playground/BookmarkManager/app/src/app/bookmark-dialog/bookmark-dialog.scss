@@ -1,0 +1,20 @@
+.bookmark-dialog {
+  &__title {
+    margin: 0;
+  }
+
+  &__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    padding-top: var(--spacing-md);
+  }
+
+  &__field {
+    width: 100%;
+  }
+
+  &__actions {
+    padding: var(--spacing-md);
+  }
+}

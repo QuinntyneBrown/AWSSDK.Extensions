@@ -1,0 +1,30 @@
+<h2 mat-dialog-title class="bookmark-dialog__title">Add Bookmark</h2>
+
+<mat-dialog-content class="bookmark-dialog__content">
+  <mat-form-field appearance="outline" class="bookmark-dialog__field">
+    <mat-label>Title</mat-label>
+    <input matInput [(ngModel)]="title" placeholder="Bookmark title">
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="bookmark-dialog__field">
+    <mat-label>URL</mat-label>
+    <input matInput [(ngModel)]="url" placeholder="https://example.com">
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="bookmark-dialog__field">
+    <mat-label>Category</mat-label>
+    <input matInput [(ngModel)]="category" placeholder="e.g., Work, Personal, Research">
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="bookmark-dialog__field">
+    <mat-label>Description</mat-label>
+    <textarea matInput [(ngModel)]="description" rows="3" placeholder="Optional description"></textarea>
+  </mat-form-field>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="bookmark-dialog__actions">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="onSave()" [disabled]="!title.trim() || !url.trim()">
+    Save
+  </button>
+</mat-dialog-actions>

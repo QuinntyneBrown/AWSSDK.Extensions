@@ -1,0 +1,34 @@
+.upload-dialog {
+  &__title {
+    margin: 0;
+  }
+
+  &__content {
+    display: flex;
+    flex-direction: column;
+    padding-top: var(--spacing-md);
+  }
+
+  &__dropzone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    border: 2px dashed rgba(0, 0, 0, 0.2);
+    border-radius: var(--border-radius);
+  }
+
+  &__input {
+    display: none;
+  }
+
+  &__filename {
+    margin: 0;
+    color: rgba(0, 0, 0, 0.6);
+  }
+
+  &__actions {
+    padding: var(--spacing-md);
+  }
+}
