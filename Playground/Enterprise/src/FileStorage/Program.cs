@@ -16,8 +16,16 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 // Configure storage service
-var databasePath = builder.Configuration.GetValue<string>("Storage:DatabasePath")
-    ?? Path.Combine(Path.GetTempPath(), "enterprise-file-storage");
+var configuredPath = builder.Configuration.GetValue<string>("Storage:DatabasePath");
+var databaseDirectory = !string.IsNullOrEmpty(configuredPath)
+    ? configuredPath
+    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "enterprise-file-storage");
+
+// Ensure the directory exists
+Directory.CreateDirectory(databaseDirectory);
+
+// The CouchbaseS3Client expects a full path including the database name
+var databasePath = Path.Combine(databaseDirectory, "filestorage");
 
 builder.Services.AddSingleton<IStorageService>(sp =>
 {

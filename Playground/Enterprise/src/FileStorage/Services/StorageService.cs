@@ -176,35 +176,21 @@ public class StorageService : IStorageService
 
         var response = await _s3Client.ListVersionsAsync(request, cancellationToken);
 
-        var versions = new List<FileVersion>();
-
-        foreach (var version in response.Versions.Where(v => v.Key == key))
-        {
-            versions.Add(new FileVersion
+        var versions = response.Versions
+            .Where(v => v.Key == key)
+            .Select(v => new FileVersion
             {
-                VersionId = version.VersionId,
-                Key = version.Key,
-                IsLatest = version.IsLatest,
-                LastModified = version.LastModified,
-                Size = version.Size,
-                IsDeleteMarker = false
-            });
-        }
+                VersionId = v.VersionId,
+                Key = v.Key,
+                IsLatest = v.IsLatest,
+                LastModified = v.LastModified,
+                Size = v.IsDeleteMarker ? 0 : v.Size,
+                IsDeleteMarker = v.IsDeleteMarker
+            })
+            .OrderByDescending(v => v.LastModified)
+            .ToList();
 
-        foreach (var marker in response.DeleteMarkers.Where(m => m.Key == key))
-        {
-            versions.Add(new FileVersion
-            {
-                VersionId = marker.VersionId,
-                Key = marker.Key,
-                IsLatest = marker.IsLatest,
-                LastModified = marker.LastModified,
-                Size = 0,
-                IsDeleteMarker = true
-            });
-        }
-
-        return versions.OrderByDescending(v => v.LastModified).ToList();
+        return versions;
     }
 
     public void Dispose()
