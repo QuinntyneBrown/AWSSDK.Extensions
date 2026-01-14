@@ -7,7 +7,8 @@
       "Bash(dotnet clean:*)",
       "Bash(dotnet build:*)",
       "Bash(powershell -Command \"Get-ChildItem -Path ''C:\\\\projects\\\\AWSSDK.Extensions\\\\playground\\\\Enterprise\\\\src\\\\FileStorage.Tests\\\\bin\\\\Debug\\\\net9.0'' -Recurse | Unblock-File\")",
-      "Bash(powershell -Command:*)"
+      "Bash(powershell -Command:*)",
+      "Bash(mkdir:*)"
     ]
   }
 }
