@@ -3,6 +3,17 @@ using FileStorage.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure CORS for frontend
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins("http://localhost:4200")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 // Configure services
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -36,6 +47,8 @@ builder.Services.AddSingleton<IStorageService>(sp =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
+app.UseCors();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -46,11 +59,12 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-// Ensure default bucket exists
+// Ensure default bucket exists and enable versioning
 using (var scope = app.Services.CreateScope())
 {
     var storageService = scope.ServiceProvider.GetRequiredService<IStorageService>();
     await storageService.EnsureBucketExistsAsync("default");
+    await storageService.EnableVersioningAsync("default");
 }
 
 // Map endpoints

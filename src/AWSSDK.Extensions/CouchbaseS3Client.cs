@@ -2044,9 +2044,15 @@ public class CouchbaseS3Client : IAmazonS3
         throw new NotImplementedException();
     }
 
-    public Task<GetObjectResponse> GetObjectAsync(string bucketName, string key, string versionId, CancellationToken cancellationToken = default)
+    public async Task<GetObjectResponse> GetObjectAsync(string bucketName, string key, string versionId, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var request = new GetObjectRequest
+        {
+            BucketName = bucketName,
+            Key = key,
+            VersionId = versionId
+        };
+        return await GetObjectAsync(request, cancellationToken);
     }
 
     /// <summary>

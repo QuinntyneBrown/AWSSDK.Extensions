@@ -1,0 +1,154 @@
+<div class="file-list">
+  <mat-toolbar class="file-list__toolbar">
+    <span class="file-list__title">File Storage</span>
+    <span class="file-list__spacer"></span>
+    <button
+      mat-icon-button
+      matTooltip="Refresh"
+      (click)="refreshFiles()"
+      class="file-list__action-btn">
+      <mat-icon>refresh</mat-icon>
+    </button>
+    <button
+      mat-flat-button
+      (click)="openUploadDialog()"
+      class="file-list__upload-btn">
+      <mat-icon>upload</mat-icon>
+      <span class="file-list__upload-text">Upload</span>
+    </button>
+  </mat-toolbar>
+
+  @if (loading$ | async) {
+    <div class="file-list__loading">
+      <mat-spinner diameter="48"></mat-spinner>
+      <span class="file-list__loading-text">Loading files...</span>
+    </div>
+  }
+
+  @if (error$ | async; as error) {
+    <div class="file-list__error">
+      <mat-icon class="file-list__error-icon">error_outline</mat-icon>
+      <span class="file-list__error-text">{{ error }}</span>
+      <button mat-button (click)="refreshFiles()">Retry</button>
+    </div>
+  }
+
+  @if ((files$ | async); as files) {
+    @if (files.length === 0 && !(loading$ | async)) {
+      <div class="file-list__empty">
+        <mat-icon class="file-list__empty-icon">folder_open</mat-icon>
+        <h3 class="file-list__empty-title">No files yet</h3>
+        <p class="file-list__empty-text">Upload your first file to get started</p>
+        <button mat-flat-button (click)="openUploadDialog()">
+          <mat-icon>upload</mat-icon>
+          Upload File
+        </button>
+      </div>
+    } @else if (files.length > 0) {
+      <!-- Mobile Card View -->
+      <div class="file-list__cards">
+        @for (file of files; track trackByKey($index, file)) {
+          <div class="file-list__card">
+            <div class="file-list__card-header">
+              <mat-icon class="file-list__card-icon">{{ getFileIcon(file.contentType) }}</mat-icon>
+              <div class="file-list__card-info">
+                <span class="file-list__card-name" [matTooltip]="file.key">
+                  {{ getFileName(file.key) }}
+                </span>
+                <span class="file-list__card-meta">
+                  {{ file.size | fileSize }} &middot; {{ file.lastModified | date:'short' }}
+                </span>
+              </div>
+              <button mat-icon-button [matMenuTriggerFor]="cardMenu" class="file-list__card-menu-btn">
+                <mat-icon>more_vert</mat-icon>
+              </button>
+              <mat-menu #cardMenu="matMenu">
+                <button mat-menu-item (click)="downloadFile(file)">
+                  <mat-icon>download</mat-icon>
+                  <span>Download</span>
+                </button>
+                <button mat-menu-item (click)="openVersionsDialog(file)">
+                  <mat-icon>history</mat-icon>
+                  <span>Versions</span>
+                </button>
+                <button mat-menu-item (click)="confirmDelete(file)" class="file-list__delete-item">
+                  <mat-icon>delete</mat-icon>
+                  <span>Delete</span>
+                </button>
+              </mat-menu>
+            </div>
+            @if (file.versionId) {
+              <div class="file-list__card-version">
+                <mat-icon class="file-list__version-icon">label</mat-icon>
+                <span class="file-list__version-text">{{ file.versionId | slice:0:8 }}</span>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Desktop Table View -->
+      <div class="file-list__table-container">
+        <table mat-table [dataSource]="files" [trackBy]="trackByKey" class="file-list__table">
+          <ng-container matColumnDef="icon">
+            <th mat-header-cell *matHeaderCellDef class="file-list__th--icon"></th>
+            <td mat-cell *matCellDef="let file" class="file-list__td--icon">
+              <mat-icon class="file-list__file-icon">{{ getFileIcon(file.contentType) }}</mat-icon>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>Name</th>
+            <td mat-cell *matCellDef="let file" class="file-list__td--name">
+              <span [matTooltip]="file.key">{{ getFileName(file.key) }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="size">
+            <th mat-header-cell *matHeaderCellDef>Size</th>
+            <td mat-cell *matCellDef="let file">{{ file.size | fileSize }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="type">
+            <th mat-header-cell *matHeaderCellDef>Type</th>
+            <td mat-cell *matCellDef="let file">{{ file.contentType || 'Unknown' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="modified">
+            <th mat-header-cell *matHeaderCellDef>Modified</th>
+            <td mat-cell *matCellDef="let file">{{ file.lastModified | date:'medium' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="version">
+            <th mat-header-cell *matHeaderCellDef>Version</th>
+            <td mat-cell *matCellDef="let file">
+              @if (file.versionId) {
+                <span class="file-list__version-badge">{{ file.versionId | slice:0:8 }}</span>
+              } @else {
+                <span class="file-list__no-version">-</span>
+              }
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef class="file-list__th--actions"></th>
+            <td mat-cell *matCellDef="let file" class="file-list__td--actions">
+              <button mat-icon-button matTooltip="Download" (click)="downloadFile(file)">
+                <mat-icon>download</mat-icon>
+              </button>
+              <button mat-icon-button matTooltip="Versions" (click)="openVersionsDialog(file)">
+                <mat-icon>history</mat-icon>
+              </button>
+              <button mat-icon-button matTooltip="Delete" (click)="confirmDelete(file)" class="file-list__delete-btn">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </table>
+      </div>
+    }
+  }
+</div>

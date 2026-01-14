@@ -1,0 +1,24 @@
+<div class="delete-confirm-dialog">
+  <div class="delete-confirm-dialog__header">
+    <div class="delete-confirm-dialog__icon-wrapper">
+      <mat-icon class="delete-confirm-dialog__icon">delete_forever</mat-icon>
+    </div>
+    <h2 class="delete-confirm-dialog__title">Delete File?</h2>
+  </div>
+
+  <mat-dialog-content class="delete-confirm-dialog__content">
+    <p class="delete-confirm-dialog__message">
+      Are you sure you want to delete <strong>{{ fileName }}</strong>?
+    </p>
+    <p class="delete-confirm-dialog__warning">
+      This action cannot be undone.
+    </p>
+  </mat-dialog-content>
+
+  <mat-dialog-actions class="delete-confirm-dialog__actions" align="end">
+    <button mat-button (click)="cancel()">Cancel</button>
+    <button mat-flat-button color="warn" (click)="confirm()" class="delete-confirm-dialog__delete-btn">
+      Delete
+    </button>
+  </mat-dialog-actions>
+</div>

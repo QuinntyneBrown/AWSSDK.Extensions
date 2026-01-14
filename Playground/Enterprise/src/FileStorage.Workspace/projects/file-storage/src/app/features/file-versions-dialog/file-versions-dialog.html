@@ -1,0 +1,67 @@
+<div class="file-versions-dialog">
+  <h2 mat-dialog-title class="file-versions-dialog__title">
+    <mat-icon class="file-versions-dialog__title-icon">history</mat-icon>
+    Version History
+  </h2>
+
+  <mat-dialog-content class="file-versions-dialog__content">
+    <div class="file-versions-dialog__file-info">
+      <mat-icon class="file-versions-dialog__file-icon">insert_drive_file</mat-icon>
+      <span class="file-versions-dialog__file-name">{{ getFileName(file.key) }}</span>
+    </div>
+
+    @if (isLoading$ | async) {
+      <div class="file-versions-dialog__loading">
+        <mat-spinner diameter="40"></mat-spinner>
+        <span class="file-versions-dialog__loading-text">Loading versions...</span>
+      </div>
+    } @else {
+      @if ((fileVersions$ | async); as versions) {
+        @if (versions.length === 0) {
+          <div class="file-versions-dialog__empty">
+            <mat-icon class="file-versions-dialog__empty-icon">history_toggle_off</mat-icon>
+            <span class="file-versions-dialog__empty-text">No version history available</span>
+            <span class="file-versions-dialog__empty-hint">Enable versioning on the bucket to track file versions</span>
+          </div>
+        } @else {
+          <mat-list class="file-versions-dialog__list">
+            @for (version of versions; track trackByVersionId($index, version)) {
+              <mat-list-item class="file-versions-dialog__version" [class.file-versions-dialog__version--deleted]="version.isDeleteMarker">
+                <div matListItemTitle class="file-versions-dialog__version-header">
+                  <span class="file-versions-dialog__version-id">{{ version.versionId | slice:0:12 }}</span>
+                  @if (version.isLatest) {
+                    <mat-chip class="file-versions-dialog__chip file-versions-dialog__chip--latest">Latest</mat-chip>
+                  }
+                  @if (version.isDeleteMarker) {
+                    <mat-chip class="file-versions-dialog__chip file-versions-dialog__chip--deleted">Deleted</mat-chip>
+                  }
+                </div>
+                <div matListItemLine class="file-versions-dialog__version-meta">
+                  @if (!version.isDeleteMarker) {
+                    <span>{{ version.size | fileSize }}</span>
+                    <span class="file-versions-dialog__meta-separator">&middot;</span>
+                  }
+                  <span>{{ version.lastModified | date:'medium' }}</span>
+                </div>
+                <div matListItemMeta class="file-versions-dialog__version-actions">
+                  @if (!version.isDeleteMarker) {
+                    <button
+                      mat-icon-button
+                      (click)="downloadVersion(version)"
+                      matTooltip="Download this version">
+                      <mat-icon>download</mat-icon>
+                    </button>
+                  }
+                </div>
+              </mat-list-item>
+            }
+          </mat-list>
+        }
+      }
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions class="file-versions-dialog__actions" align="end">
+    <button mat-flat-button (click)="close()">Close</button>
+  </mat-dialog-actions>
+</div>

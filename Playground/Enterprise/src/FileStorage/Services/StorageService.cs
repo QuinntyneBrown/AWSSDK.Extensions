@@ -95,22 +95,31 @@ public class StorageService : IStorageService
         string? prefix = null,
         CancellationToken cancellationToken = default)
     {
-        var request = new ListObjectsV2Request
+        // Use ListVersionsAsync to get version IDs
+        var request = new ListVersionsRequest
         {
             BucketName = bucketName,
             Prefix = prefix
         };
 
-        var response = await _s3Client.ListObjectsV2Async(request, cancellationToken);
+        var response = await _s3Client.ListVersionsAsync(request, cancellationToken);
 
-        return response.S3Objects.Select(obj => new StoredFile
-        {
-            BucketName = bucketName,
-            Key = obj.Key,
-            ETag = obj.ETag,
-            Size = obj.Size,
-            LastModified = obj.LastModified
-        }).ToList();
+        // Group by key and get the latest version for each file
+        return response.Versions
+            .Where(v => !v.IsDeleteMarker)
+            .GroupBy(v => v.Key)
+            .Select(g => g.OrderByDescending(v => v.LastModified).First())
+            .Select(v => new StoredFile
+            {
+                BucketName = bucketName,
+                Key = v.Key,
+                VersionId = v.VersionId,
+                ETag = v.ETag,
+                Size = v.Size,
+                LastModified = v.LastModified
+            })
+            .OrderBy(f => f.Key)
+            .ToList();
     }
 
     public async Task<bool> DeleteFileAsync(
@@ -121,6 +130,10 @@ public class StorageService : IStorageService
     {
         try
         {
+            // First check if the file exists
+            await _s3Client.GetObjectMetadataAsync(bucketName, key, cancellationToken);
+
+            // File exists, proceed with deletion
             if (!string.IsNullOrEmpty(versionId))
             {
                 await _s3Client.DeleteObjectAsync(bucketName, key, versionId, cancellationToken);

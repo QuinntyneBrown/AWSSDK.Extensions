@@ -1,0 +1,63 @@
+<div class="file-select-dialog">
+  <h2 mat-dialog-title class="file-select-dialog__title">Select File</h2>
+
+  <mat-dialog-content class="file-select-dialog__content">
+    <mat-form-field class="file-select-dialog__search" appearance="outline">
+      <mat-label>Search files</mat-label>
+      <mat-icon matPrefix>search</mat-icon>
+      <input
+        matInput
+        [(ngModel)]="searchValue"
+        (ngModelChange)="onSearchChange($event)"
+        placeholder="Search by name or type..." />
+      @if (searchValue) {
+        <button matSuffix mat-icon-button (click)="searchValue = ''; onSearchChange('')">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+    </mat-form-field>
+
+    @if (loading$ | async) {
+      <div class="file-select-dialog__loading">
+        <mat-spinner diameter="40"></mat-spinner>
+        <span class="file-select-dialog__loading-text">Loading files...</span>
+      </div>
+    } @else {
+      @if ((filteredFiles$ | async); as files) {
+        @if (files.length === 0) {
+          <div class="file-select-dialog__empty">
+            <mat-icon class="file-select-dialog__empty-icon">search_off</mat-icon>
+            <span class="file-select-dialog__empty-text">No files found</span>
+          </div>
+        } @else {
+          <mat-selection-list
+            #fileList
+            [multiple]="false"
+            class="file-select-dialog__list"
+            (selectionChange)="onSelectionChange($event)">
+            @for (file of files; track trackByKey($index, file)) {
+              <mat-list-option [value]="file" class="file-select-dialog__option">
+                <mat-icon matListItemIcon class="file-select-dialog__option-icon">
+                  {{ getFileIcon(file.contentType) }}
+                </mat-icon>
+                <div matListItemTitle class="file-select-dialog__option-name">
+                  {{ getFileName(file.key) }}
+                </div>
+                <div matListItemLine class="file-select-dialog__option-meta">
+                  {{ file.size | fileSize }} &middot; {{ file.lastModified | date:'short' }}
+                </div>
+              </mat-list-option>
+            }
+          </mat-selection-list>
+        }
+      }
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions class="file-select-dialog__actions" align="end">
+    <button mat-button (click)="cancel()">Cancel</button>
+    <button mat-flat-button (click)="selectFile()" [disabled]="!(hasSelection$ | async)">
+      Select
+    </button>
+  </mat-dialog-actions>
+</div>

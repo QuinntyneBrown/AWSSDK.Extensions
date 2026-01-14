@@ -1,0 +1,74 @@
+<div class="file-upload-dialog">
+  <h2 mat-dialog-title class="file-upload-dialog__title">Upload File</h2>
+
+  <mat-dialog-content class="file-upload-dialog__content">
+    <input
+      #fileInput
+      type="file"
+      class="file-upload-dialog__hidden-input"
+      (change)="onFileSelected($event)" />
+
+    @if (!selectedFile) {
+      <div
+        class="file-upload-dialog__dropzone"
+        [class.file-upload-dialog__dropzone--active]="isDragOver"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)"
+        (click)="triggerFileInput()">
+        <mat-icon class="file-upload-dialog__dropzone-icon">cloud_upload</mat-icon>
+        <span class="file-upload-dialog__dropzone-text">
+          Drag & drop a file here or click to browse
+        </span>
+        <span class="file-upload-dialog__dropzone-hint">
+          Any file type supported
+        </span>
+      </div>
+    } @else {
+      <div class="file-upload-dialog__preview">
+        <div class="file-upload-dialog__preview-header">
+          <mat-icon class="file-upload-dialog__preview-icon">insert_drive_file</mat-icon>
+          <div class="file-upload-dialog__preview-info">
+            <span class="file-upload-dialog__preview-name">{{ selectedFile.name }}</span>
+            <span class="file-upload-dialog__preview-size">{{ selectedFile.size | fileSize }}</span>
+          </div>
+          <button
+            mat-icon-button
+            (click)="clearSelection()"
+            class="file-upload-dialog__preview-clear"
+            [disabled]="isUploading$ | async">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+
+        <mat-form-field class="file-upload-dialog__key-field" appearance="outline">
+          <mat-label>File Key (path/name)</mat-label>
+          <input
+            matInput
+            [(ngModel)]="customKey"
+            placeholder="e.g., documents/report.pdf"
+            [disabled]="(isUploading$ | async) ?? false" />
+          <mat-hint>The key identifies the file in storage</mat-hint>
+        </mat-form-field>
+      </div>
+
+      @if (isUploading$ | async) {
+        <mat-progress-bar mode="indeterminate" class="file-upload-dialog__progress"></mat-progress-bar>
+      }
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions class="file-upload-dialog__actions" align="end">
+    <button mat-button (click)="cancel()" [disabled]="isUploading$ | async">Cancel</button>
+    <button
+      mat-flat-button
+      (click)="upload()"
+      [disabled]="!selectedFile || !customKey.trim() || (isUploading$ | async)">
+      @if (isUploading$ | async) {
+        Uploading...
+      } @else {
+        Upload
+      }
+    </button>
+  </mat-dialog-actions>
+</div>
