@@ -1,0 +1,42 @@
+.load-dialog {
+  &__title {
+    margin: 0;
+  }
+
+  &__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    padding-top: var(--spacing-md);
+  }
+
+  &__meta {
+    display: flex;
+    gap: var(--spacing-lg);
+    color: rgba(0, 0, 0, 0.6);
+  }
+
+  &__meta-item {
+    font-size: 0.875rem;
+  }
+
+  &__description {
+    margin: 0;
+    color: rgba(0, 0, 0, 0.87);
+  }
+
+  &__code {
+    background-color: rgba(0, 0, 0, 0.04);
+    padding: var(--spacing-md);
+    border-radius: var(--border-radius);
+    overflow-x: auto;
+    font-family: monospace;
+    font-size: 0.875rem;
+    margin: 0;
+    max-height: 400px;
+  }
+
+  &__actions {
+    padding: var(--spacing-md);
+  }
+}

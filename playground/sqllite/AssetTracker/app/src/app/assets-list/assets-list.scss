@@ -1,0 +1,39 @@
+.assets-list {
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+  }
+
+  &__title {
+    margin: 0;
+    color: rgba(0, 0, 0, 0.87);
+  }
+
+  &__controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+
+  &__filter {
+    width: 180px;
+  }
+
+  &__card {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  &__table {
+    width: 100%;
+  }
+
+  &__status {
+    &--available { background-color: #c8e6c9 !important; color: #2e7d32 !important; }
+    &--in-use { background-color: #bbdefb !important; color: #1565c0 !important; }
+    &--maintenance { background-color: #fff9c4 !important; color: #f9a825 !important; }
+    &--retired { background-color: #ffccbc !important; color: #d84315 !important; }
+  }
+}

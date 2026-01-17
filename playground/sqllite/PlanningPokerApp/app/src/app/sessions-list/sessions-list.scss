@@ -1,0 +1,57 @@
+.sessions-list {
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+  }
+
+  &__title {
+    margin: 0;
+    color: rgba(0, 0, 0, 0.87);
+  }
+
+  &__card {
+    padding: 0;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    padding: var(--spacing-md);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+    height: auto !important;
+    cursor: pointer;
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.04);
+    }
+  }
+
+  &__icon {
+    margin-right: var(--spacing-md);
+    color: rgba(0, 0, 0, 0.54);
+  }
+
+  &__content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+
+  &__item-name {
+    font-weight: 500;
+  }
+
+  &__item-info {
+    font-size: 0.875rem;
+    color: rgba(0, 0, 0, 0.6);
+  }
+
+  &__empty {
+    padding: var(--spacing-lg);
+    text-align: center;
+    color: rgba(0, 0, 0, 0.6);
+  }
+}

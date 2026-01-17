@@ -1,0 +1,41 @@
+<div class="events-list">
+  <div class="events-list__header">
+    <h2 class="events-list__title">Event Log</h2>
+    <div class="events-list__controls">
+      <mat-form-field appearance="outline" class="events-list__filter">
+        <mat-label>Filter by Level</mat-label>
+        <mat-select [value]="selectedLevel$ | async" (selectionChange)="onFilterChange($event.value)">
+          <mat-option value="">All Levels</mat-option>
+          @for (level of levels; track level) {
+            <mat-option [value]="level">{{ level | titlecase }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <button mat-stroked-button color="warn" (click)="clearAll()">
+        <mat-icon>delete_sweep</mat-icon>
+        Clear All
+      </button>
+      <button mat-fab color="primary" (click)="openAddDialog()">
+        <mat-icon>add</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <div class="events-list__log">
+    @for (event of events$ | async; track event.id) {
+      <div class="events-list__entry" [class]="getLevelClass(event.level)">
+        <div class="events-list__timestamp">{{ event.timestamp | date:'medium' }}</div>
+        <mat-chip-set class="events-list__level-chip">
+          <mat-chip [class]="getLevelClass(event.level)">{{ event.level | uppercase }}</mat-chip>
+        </mat-chip-set>
+        <span class="events-list__source">[{{ event.source }}]</span>
+        <span class="events-list__message">{{ event.message }}</span>
+      </div>
+    } @empty {
+      <div class="events-list__empty">
+        <mat-icon class="events-list__empty-icon">inbox</mat-icon>
+        <p>No events logged. Click + to add one!</p>
+      </div>
+    }
+  </div>
+</div>

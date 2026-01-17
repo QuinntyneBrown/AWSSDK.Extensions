@@ -1,0 +1,31 @@
+<div class="notes-list">
+  <div class="notes-list__header">
+    <h2 class="notes-list__title">My Notes</h2>
+    <button mat-fab color="primary" (click)="openCreateDialog()">
+      <mat-icon>add</mat-icon>
+    </button>
+  </div>
+
+  <div class="notes-list__grid">
+    @for (note of notes$ | async; track note.id) {
+      <mat-card class="notes-list__card notes-list__card--{{ note.color }}" (click)="openEditDialog(note)">
+        <mat-card-header>
+          <mat-card-title class="notes-list__note-title">{{ note.title }}</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <p class="notes-list__note-content">{{ note.content }}</p>
+        </mat-card-content>
+        <mat-card-actions align="end">
+          <button mat-icon-button color="warn" (click)="deleteNote(note); $event.stopPropagation()">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </mat-card-actions>
+      </mat-card>
+    } @empty {
+      <div class="notes-list__empty">
+        <mat-icon class="notes-list__empty-icon">note_add</mat-icon>
+        <p>No notes yet. Click + to create one!</p>
+      </div>
+    }
+  </div>
+</div>

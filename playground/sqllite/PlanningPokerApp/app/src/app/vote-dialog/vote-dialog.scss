@@ -1,0 +1,32 @@
+.vote-dialog {
+  &__title {
+    margin: 0;
+  }
+
+  &__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    padding-top: var(--spacing-md);
+  }
+
+  &__field {
+    width: 100%;
+  }
+
+  &__cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-sm);
+  }
+
+  &__card {
+    height: 60px;
+    font-size: 1.25rem;
+    font-weight: 500;
+  }
+
+  &__actions {
+    padding: var(--spacing-md);
+  }
+}

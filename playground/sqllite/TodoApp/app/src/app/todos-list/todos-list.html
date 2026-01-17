@@ -1,0 +1,38 @@
+<div class="todos-list">
+  <div class="todos-list__header">
+    <h2 class="todos-list__title">My Tasks</h2>
+    <button mat-fab color="primary" (click)="openAddDialog()">
+      <mat-icon>add</mat-icon>
+    </button>
+  </div>
+
+  <mat-card class="todos-list__card">
+    <mat-list>
+      @for (todo of todos$ | async; track todo.id) {
+        <mat-list-item class="todos-list__item">
+          <mat-checkbox
+            [checked]="todo.isCompleted"
+            (change)="toggleComplete(todo)"
+            class="todos-list__checkbox">
+          </mat-checkbox>
+          <div class="todos-list__content" [class.todos-list__content--completed]="todo.isCompleted">
+            <span class="todos-list__item-title">{{ todo.title }}</span>
+            <span class="todos-list__item-description">{{ todo.description }}</span>
+          </div>
+          <div class="todos-list__actions">
+            <button mat-icon-button (click)="openEditDialog(todo)">
+              <mat-icon>edit</mat-icon>
+            </button>
+            <button mat-icon-button color="warn" (click)="deleteTodo(todo)">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        </mat-list-item>
+      } @empty {
+        <mat-list-item class="todos-list__empty">
+          <span>No tasks yet. Click the + button to add one!</span>
+        </mat-list-item>
+      }
+    </mat-list>
+  </mat-card>
+</div>

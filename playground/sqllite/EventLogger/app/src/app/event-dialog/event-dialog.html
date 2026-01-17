@@ -1,0 +1,31 @@
+<h2 mat-dialog-title class="event-dialog__title">Log Event</h2>
+
+<mat-dialog-content class="event-dialog__content">
+  <mat-form-field appearance="outline" class="event-dialog__field">
+    <mat-label>Message</mat-label>
+    <textarea matInput [(ngModel)]="message" rows="3" placeholder="Event message"></textarea>
+  </mat-form-field>
+
+  <div class="event-dialog__row">
+    <mat-form-field appearance="outline" class="event-dialog__field">
+      <mat-label>Level</mat-label>
+      <mat-select [(ngModel)]="level">
+        @for (l of levels; track l) {
+          <mat-option [value]="l">{{ l | titlecase }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="event-dialog__field">
+      <mat-label>Source</mat-label>
+      <input matInput [(ngModel)]="source" placeholder="e.g., API, Worker">
+    </mat-form-field>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="event-dialog__actions">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="onSave()" [disabled]="!message.trim()">
+    Log
+  </button>
+</mat-dialog-actions>

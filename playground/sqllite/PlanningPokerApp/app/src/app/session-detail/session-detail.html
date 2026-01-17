@@ -1,0 +1,56 @@
+@if (session$ | async; as session) {
+  <div class="session-detail">
+    <div class="session-detail__header">
+      <button mat-icon-button (click)="goBack()">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+      <h2 class="session-detail__title">{{ session.name }}</h2>
+    </div>
+
+    <mat-card class="session-detail__card">
+      <mat-card-header>
+        <mat-card-title>Current Story</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p class="session-detail__story">{{ session.currentStory || 'No story set' }}</p>
+      </mat-card-content>
+    </mat-card>
+
+    <div class="session-detail__actions">
+      <button mat-raised-button color="primary" (click)="openVoteDialog()">
+        <mat-icon>how_to_vote</mat-icon>
+        Vote
+      </button>
+      <button mat-raised-button color="accent" (click)="revealVotes()" [disabled]="session.votes.length === 0">
+        <mat-icon>visibility</mat-icon>
+        Reveal
+      </button>
+      <button mat-raised-button (click)="resetVotes()">
+        <mat-icon>refresh</mat-icon>
+        Reset
+      </button>
+    </div>
+
+    <mat-card class="session-detail__votes-card">
+      <mat-card-header>
+        <mat-card-title>Votes ({{ session.votes.length }})</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="session-detail__votes">
+          @for (vote of session.votes; track vote.participantName) {
+            <div class="session-detail__vote">
+              <span class="session-detail__voter">{{ vote.participantName }}</span>
+              <mat-chip-set>
+                <mat-chip [highlighted]="session.isRevealed">
+                  {{ session.isRevealed ? vote.value : '?' }}
+                </mat-chip>
+              </mat-chip-set>
+            </div>
+          } @empty {
+            <p class="session-detail__no-votes">No votes yet</p>
+          }
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+}

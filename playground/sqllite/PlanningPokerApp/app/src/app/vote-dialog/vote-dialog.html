@@ -1,0 +1,29 @@
+<h2 mat-dialog-title class="vote-dialog__title">Submit Your Vote</h2>
+
+<mat-dialog-content class="vote-dialog__content">
+  <mat-form-field appearance="outline" class="vote-dialog__field">
+    <mat-label>Your Name</mat-label>
+    <input matInput [(ngModel)]="participantName" placeholder="Enter your name">
+  </mat-form-field>
+
+  <div class="vote-dialog__cards">
+    @for (value of data.cardValues; track value) {
+      <button
+        mat-raised-button
+        class="vote-dialog__card"
+        [class.vote-dialog__card--selected]="selectedValue === value"
+        [color]="selectedValue === value ? 'primary' : undefined"
+        (click)="selectCard(value)">
+        {{ value }}
+      </button>
+    }
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="vote-dialog__actions">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="onSubmit()"
+    [disabled]="!participantName.trim() || !selectedValue">
+    Submit
+  </button>
+</mat-dialog-actions>

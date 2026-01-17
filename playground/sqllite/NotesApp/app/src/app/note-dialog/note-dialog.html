@@ -1,0 +1,32 @@
+<h2 mat-dialog-title class="note-dialog__title">
+  {{ data.mode === 'create' ? 'New Note' : 'Edit Note' }}
+</h2>
+
+<mat-dialog-content class="note-dialog__content">
+  <mat-form-field appearance="outline" class="note-dialog__field">
+    <mat-label>Title</mat-label>
+    <input matInput [(ngModel)]="title" placeholder="Note title">
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="note-dialog__field">
+    <mat-label>Content</mat-label>
+    <textarea matInput [(ngModel)]="content" rows="6" placeholder="Write your note..."></textarea>
+  </mat-form-field>
+
+  <div class="note-dialog__colors">
+    <label class="note-dialog__colors-label">Color</label>
+    <mat-button-toggle-group [(ngModel)]="color">
+      @for (c of colors; track c) {
+        <mat-button-toggle [value]="c" class="note-dialog__color-toggle note-dialog__color-toggle--{{ c }}">
+        </mat-button-toggle>
+      }
+    </mat-button-toggle-group>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="note-dialog__actions">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="onSave()" [disabled]="!title.trim()">
+    Save
+  </button>
+</mat-dialog-actions>
