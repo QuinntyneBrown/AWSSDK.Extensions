@@ -1,0 +1,26 @@
+.config-dialog {
+  &__title {
+    margin: 0;
+  }
+
+  &__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    padding-top: var(--spacing-md);
+  }
+
+  &__row {
+    display: flex;
+    gap: var(--spacing-md);
+  }
+
+  &__field {
+    flex: 1;
+    width: 100%;
+  }
+
+  &__actions {
+    padding: var(--spacing-md);
+  }
+}

@@ -1,0 +1,11 @@
+.main-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #1a1a2e;
+
+  &__content {
+    flex: 1;
+    padding: var(--spacing-lg);
+  }
+}

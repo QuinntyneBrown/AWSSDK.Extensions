@@ -1,0 +1,45 @@
+<h2 mat-dialog-title class="config-dialog__title">Create Configuration File</h2>
+
+<mat-dialog-content class="config-dialog__content">
+  <mat-form-field appearance="outline" class="config-dialog__field">
+    <mat-label>Name</mat-label>
+    <input matInput [(ngModel)]="name" placeholder="e.g., app-settings">
+  </mat-form-field>
+
+  <div class="config-dialog__row">
+    <mat-form-field appearance="outline" class="config-dialog__field">
+      <mat-label>File Type</mat-label>
+      <mat-select [(ngModel)]="fileType">
+        @for (type of fileTypes; track type) {
+          <mat-option [value]="type">{{ type }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="config-dialog__field">
+      <mat-label>Environment</mat-label>
+      <mat-select [(ngModel)]="environment">
+        @for (env of environments; track env) {
+          <mat-option [value]="env">{{ env }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <mat-form-field appearance="outline" class="config-dialog__field">
+    <mat-label>Description</mat-label>
+    <input matInput [(ngModel)]="description" placeholder="Brief description">
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="config-dialog__field">
+    <mat-label>Content</mat-label>
+    <textarea matInput [(ngModel)]="content" rows="10" placeholder="Paste configuration content here"></textarea>
+  </mat-form-field>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="config-dialog__actions">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="onCreate()" [disabled]="!name.trim() || !fileType">
+    Create
+  </button>
+</mat-dialog-actions>

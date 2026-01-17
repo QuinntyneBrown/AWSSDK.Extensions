@@ -1,0 +1,33 @@
+.dashboard {
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+  }
+
+  &__title {
+    margin: 0;
+    color: #ffffff;
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--spacing-md);
+  }
+
+  &__empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: var(--spacing-xl);
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  &__empty-icon {
+    font-size: 64px;
+    width: 64px;
+    height: 64px;
+    color: rgba(255, 255, 255, 0.3);
+  }
+}

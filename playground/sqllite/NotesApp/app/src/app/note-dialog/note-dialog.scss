@@ -1,0 +1,43 @@
+.note-dialog {
+  &__title {
+    margin: 0;
+  }
+
+  &__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    padding-top: var(--spacing-md);
+  }
+
+  &__field {
+    width: 100%;
+  }
+
+  &__colors {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  &__colors-label {
+    font-size: 0.875rem;
+    color: rgba(0, 0, 0, 0.6);
+  }
+
+  &__color-toggle {
+    width: 32px !important;
+    height: 32px !important;
+
+    &--default { background-color: #ffffff !important; }
+    &--yellow { background-color: #fff9c4 !important; }
+    &--green { background-color: #c8e6c9 !important; }
+    &--blue { background-color: #bbdefb !important; }
+    &--pink { background-color: #f8bbd0 !important; }
+    &--purple { background-color: #e1bee7 !important; }
+  }
+
+  &__actions {
+    padding: var(--spacing-md);
+  }
+}

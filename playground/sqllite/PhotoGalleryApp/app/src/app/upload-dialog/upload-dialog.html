@@ -1,0 +1,21 @@
+<h2 mat-dialog-title class="upload-dialog__title">Upload Photo</h2>
+
+<mat-dialog-content class="upload-dialog__content">
+  <div class="upload-dialog__dropzone">
+    <input type="file" accept="image/*" (change)="onFileSelected($event)" class="upload-dialog__input" #fileInput>
+    <button mat-stroked-button (click)="fileInput.click()">
+      <mat-icon>cloud_upload</mat-icon>
+      Choose File
+    </button>
+    @if (selectedFile) {
+      <p class="upload-dialog__filename">{{ selectedFile.name }}</p>
+    }
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="upload-dialog__actions">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="onUpload()" [disabled]="!selectedFile">
+    Upload
+  </button>
+</mat-dialog-actions>

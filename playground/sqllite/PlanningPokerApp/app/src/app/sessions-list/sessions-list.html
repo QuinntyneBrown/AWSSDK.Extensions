@@ -1,0 +1,29 @@
+<div class="sessions-list">
+  <div class="sessions-list__header">
+    <h2 class="sessions-list__title">Sessions</h2>
+    <button mat-fab color="primary" (click)="openCreateDialog()">
+      <mat-icon>add</mat-icon>
+    </button>
+  </div>
+
+  <mat-card class="sessions-list__card">
+    <mat-list>
+      @for (session of sessions$ | async; track session.id) {
+        <mat-list-item class="sessions-list__item" (click)="openSession(session)">
+          <mat-icon class="sessions-list__icon">groups</mat-icon>
+          <div class="sessions-list__content">
+            <span class="sessions-list__item-name">{{ session.name }}</span>
+            <span class="sessions-list__item-info">{{ session.votes.length }} votes</span>
+          </div>
+          <button mat-icon-button color="warn" (click)="deleteSession(session, $event)">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </mat-list-item>
+      } @empty {
+        <mat-list-item class="sessions-list__empty">
+          <span>No sessions yet. Create one to start!</span>
+        </mat-list-item>
+      }
+    </mat-list>
+  </mat-card>
+</div>

@@ -1,0 +1,27 @@
+<div class="gallery">
+  <div class="gallery__header">
+    <h2 class="gallery__title">My Photos</h2>
+    <button mat-fab color="primary" (click)="openUploadDialog()">
+      <mat-icon>add_photo_alternate</mat-icon>
+    </button>
+  </div>
+
+  <div class="gallery__grid">
+    @for (photo of photos$ | async; track photo.id) {
+      <mat-card class="gallery__card" (click)="openPhotoDialog(photo)">
+        <img [src]="getPhotoUrl(photo.id)" [alt]="photo.name" class="gallery__image">
+        <mat-card-content class="gallery__card-content">
+          <span class="gallery__photo-name">{{ photo.name }}</span>
+        </mat-card-content>
+        <button mat-icon-button color="warn" class="gallery__delete" (click)="deletePhoto(photo, $event)">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </mat-card>
+    } @empty {
+      <div class="gallery__empty">
+        <mat-icon class="gallery__empty-icon">photo_library</mat-icon>
+        <p>No photos yet. Click the + button to upload!</p>
+      </div>
+    }
+  </div>
+</div>

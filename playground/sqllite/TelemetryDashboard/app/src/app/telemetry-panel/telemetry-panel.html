@@ -1,0 +1,31 @@
+<mat-card class="telemetry-panel">
+  <mat-card-header class="telemetry-panel__header">
+    <mat-card-title class="telemetry-panel__title">{{ panel.title }}</mat-card-title>
+    <button mat-icon-button class="telemetry-panel__delete" (click)="onDelete()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </mat-card-header>
+
+  <mat-card-content class="telemetry-panel__content">
+    @if (point) {
+      <div class="telemetry-panel__value">
+        <span class="telemetry-panel__number">{{ point.value | number:'1.2-2' }}</span>
+        <span class="telemetry-panel__unit">{{ point.unit }}</span>
+      </div>
+      <mat-progress-bar
+        mode="determinate"
+        [value]="percentage"
+        class="telemetry-panel__bar">
+      </mat-progress-bar>
+      <div class="telemetry-panel__range">
+        <span>{{ point.minValue }}</span>
+        <span>{{ point.maxValue }}</span>
+      </div>
+      <div class="telemetry-panel__meta">
+        <span class="telemetry-panel__category">{{ point.category }}</span>
+      </div>
+    } @else {
+      <div class="telemetry-panel__no-data">No data</div>
+    }
+  </mat-card-content>
+</mat-card>
