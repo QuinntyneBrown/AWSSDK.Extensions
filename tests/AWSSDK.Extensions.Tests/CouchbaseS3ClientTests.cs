@@ -1305,7 +1305,7 @@ public class CouchbaseS3ClientTests
     #region Versioning Configuration Tests
 
     [Test]
-    public async Task GetBucketVersioning_NewBucket_ReturnsOff()
+    public async Task GetBucketVersioning_NewBucket_ReturnsNullStatus()
     {
         // Arrange
         await _client.PutBucketAsync("test-bucket");
@@ -1313,9 +1313,9 @@ public class CouchbaseS3ClientTests
         // Act
         var response = await _client.GetBucketVersioningAsync("test-bucket");
 
-        // Assert
+        // Assert - AWS S3 returns null status for buckets that have never had versioning configured
         Assert.That(response.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
-        Assert.That(response.VersioningConfig.Status, Is.EqualTo(VersionStatus.Off));
+        Assert.That(response.VersioningConfig.Status, Is.Null);
     }
 
     [Test]

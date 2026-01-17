@@ -495,13 +495,11 @@ public class CouchbaseS3Client : IAmazonS3
     /// </summary>
     private static void CheckConditionalGetHeaders(GetObjectRequest request, string? objectETag, DateTime lastModified)
     {
-        // Get conditional headers from request - support both standard HTTP headers and AWS-specific headers
-        var ifMatch = request.EtagToMatch ?? request.Headers?["If-Match"];
-        var ifNoneMatch = request.EtagToNotMatch ?? request.Headers?["If-None-Match"];
-        var ifModifiedSince = request.ModifiedSinceDateUtc ??
-            (DateTime.TryParse(request.Headers?["If-Modified-Since"], out var parsedModifiedSince) ? parsedModifiedSince : (DateTime?)null);
-        var ifUnmodifiedSince = request.UnmodifiedSinceDateUtc ??
-            (DateTime.TryParse(request.Headers?["If-Unmodified-Since"], out var parsedUnmodifiedSince) ? parsedUnmodifiedSince : (DateTime?)null);
+        // Get conditional headers from request
+        var ifMatch = request.EtagToMatch;
+        var ifNoneMatch = request.EtagToNotMatch;
+        DateTime? ifModifiedSince = request.ModifiedSinceDateUtc != DateTime.MinValue ? request.ModifiedSinceDateUtc : null;
+        DateTime? ifUnmodifiedSince = request.UnmodifiedSinceDateUtc != DateTime.MinValue ? request.UnmodifiedSinceDateUtc : null;
 
         // Normalize ETag for comparison (remove surrounding quotes if present)
         var normalizedObjectETag = objectETag?.Trim('"');
@@ -928,38 +926,6 @@ public class CouchbaseS3Client : IAmazonS3
             var isVersioningEnabled = versioningStatus == "Enabled";
             var isVersioningSuspended = versioningStatus == "Suspended";
 
-            // Check conditional delete headers (If-Match)
-            var ifMatch = request.Headers?["If-Match"] ?? request.Headers?["x-amz-if-match"];
-            if (!string.IsNullOrEmpty(ifMatch))
-            {
-                var objectDocId = $"object::{request.BucketName}::{request.Key}";
-                var existingDoc = _database.GetDocument(objectDocId);
-
-                if (existingDoc == null)
-                {
-                    // Object doesn't exist - precondition failed
-                    throw new AmazonS3Exception("At least one of the preconditions you specified did not hold")
-                    {
-                        StatusCode = HttpStatusCode.PreconditionFailed,
-                        ErrorCode = "PreconditionFailed"
-                    };
-                }
-
-                var existingETag = existingDoc.GetString("etag");
-                var normalizedIfMatch = ifMatch.Trim('"');
-                var normalizedExistingETag = existingETag?.Trim('"');
-
-                // Wildcard "*" means "object must exist" (which we already checked above)
-                if (normalizedIfMatch != "*" && normalizedExistingETag != normalizedIfMatch)
-                {
-                    throw new AmazonS3Exception("At least one of the preconditions you specified did not hold")
-                    {
-                        StatusCode = HttpStatusCode.PreconditionFailed,
-                        ErrorCode = "PreconditionFailed"
-                    };
-                }
-            }
-
             // If a specific version ID is provided, delete that version document
             if (!string.IsNullOrEmpty(request.VersionId))
             {
@@ -1266,7 +1232,7 @@ public class CouchbaseS3Client : IAmazonS3
                             {
                                 Key = keyVersion.Key,
                                 VersionId = keyVersion.VersionId,
-                                DeleteMarker = "true",
+                                DeleteMarker = true,
                                 DeleteMarkerVersionId = keyVersion.VersionId
                             });
                             continue;
@@ -1377,7 +1343,7 @@ public class CouchbaseS3Client : IAmazonS3
                         deletedObjects.Add(new DeletedObject
                         {
                             Key = keyVersion.Key,
-                            DeleteMarker = "true",
+                            DeleteMarker = true,
                             DeleteMarkerVersionId = deleteMarkerVersionId
                         });
                     }
@@ -1449,7 +1415,7 @@ public class CouchbaseS3Client : IAmazonS3
                         deletedObjects.Add(new DeletedObject
                         {
                             Key = keyVersion.Key,
-                            DeleteMarker = "true",
+                            DeleteMarker = true,
                             DeleteMarkerVersionId = "null"
                         });
                     }
@@ -3734,7 +3700,7 @@ public class CouchbaseS3Client : IAmazonS3
             {
                 status = VersionStatus.Suspended;
             }
-            // When versioningStatus is null/empty (never configured), status remains null
+            // When versioningStatus is null/empty (never configured), status remains null (matching AWS S3 behavior)
 
             var mfaDeleteEnabled = bucketDoc.GetBoolean("mfaDeleteEnabled");
 

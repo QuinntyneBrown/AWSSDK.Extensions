@@ -259,6 +259,7 @@ public class SqlLiteS3Client : IAmazonS3, IDisposable
                 status = VersionStatus.Enabled;
             else if (versioningStatus == "Suspended")
                 status = VersionStatus.Suspended;
+            // When versioningStatus is null/empty (never configured), status remains null (matching AWS S3 behavior)
 
             return new GetBucketVersioningResponse
             {
@@ -1016,7 +1017,7 @@ public class SqlLiteS3Client : IAmazonS3, IDisposable
                                 {
                                     Key = keyVersion.Key,
                                     VersionId = keyVersion.VersionId,
-                                    DeleteMarker = "true",
+                                    DeleteMarker = true,
                                     DeleteMarkerVersionId = keyVersion.VersionId
                                 });
                                 continue;
@@ -1120,7 +1121,7 @@ public class SqlLiteS3Client : IAmazonS3, IDisposable
                         deletedObjects.Add(new DeletedObject
                         {
                             Key = keyVersion.Key,
-                            DeleteMarker = "true",
+                            DeleteMarker = true,
                             DeleteMarkerVersionId = deleteMarkerVersionId
                         });
                     }
@@ -1154,7 +1155,7 @@ public class SqlLiteS3Client : IAmazonS3, IDisposable
                         deletedObjects.Add(new DeletedObject
                         {
                             Key = keyVersion.Key,
-                            DeleteMarker = "true",
+                            DeleteMarker = true,
                             DeleteMarkerVersionId = "null"
                         });
                     }
