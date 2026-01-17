@@ -2513,7 +2513,9 @@ public class SqlLiteS3Client : IAmazonS3, IDisposable
 
             // Update retention
             var mode = request.Retention?.Mode?.Value;
-            var until = request.Retention?.RetainUntilDate?.ToString("o");
+            var until = request.Retention != null && request.Retention.RetainUntilDate != DateTime.MinValue
+                ? request.Retention.RetainUntilDate.ToString("o")
+                : null;
 
             using var cmd = _connection.CreateCommand();
             cmd.CommandText = "UPDATE objects SET retention_mode = @mode, retention_until = @until WHERE bucket_name = @bucketName AND key = @key";
