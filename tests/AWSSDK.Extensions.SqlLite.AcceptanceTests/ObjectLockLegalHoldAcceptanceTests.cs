@@ -37,7 +37,7 @@ public class ObjectLockLegalHoldAcceptanceTests : IDisposable
 
     #region 6.1 PutObjectLegalHoldAsync
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectLegalHoldAsync_EnableLegalHold_SetsStatusOn()
     {
         // Arrange
@@ -75,7 +75,7 @@ public class ObjectLockLegalHoldAcceptanceTests : IDisposable
         Assert.Equal("ON", getResponse.LegalHold?.Status?.Value);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectLegalHoldAsync_DisableLegalHold_SetsStatusOff()
     {
         // Arrange
@@ -124,7 +124,7 @@ public class ObjectLockLegalHoldAcceptanceTests : IDisposable
         Assert.Equal("OFF", getResponse.LegalHold?.Status?.Value);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectLegalHold_WithRetention_BothCanBeSet()
     {
         // Arrange
@@ -179,7 +179,7 @@ public class ObjectLockLegalHoldAcceptanceTests : IDisposable
         Assert.Equal("ON", legalHoldResponse.LegalHold?.Status?.Value);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectLegalHoldAsync_NonExistentObject_ThrowsException()
     {
         // Arrange
@@ -206,7 +206,7 @@ public class ObjectLockLegalHoldAcceptanceTests : IDisposable
 
     #region 6.2 GetObjectLegalHoldAsync
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectLegalHoldAsync_HoldEnabled_ReturnsOn()
     {
         // Arrange
@@ -242,7 +242,7 @@ public class ObjectLockLegalHoldAcceptanceTests : IDisposable
         Assert.Equal("ON", response.LegalHold?.Status?.Value);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectLegalHoldAsync_HoldNotEnabled_ReturnsOff()
     {
         // Arrange
@@ -268,7 +268,7 @@ public class ObjectLockLegalHoldAcceptanceTests : IDisposable
         Assert.Equal("OFF", response.LegalHold?.Status?.Value);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectLegalHoldAsync_NonExistentObject_ThrowsException()
     {
         // Arrange
@@ -287,7 +287,7 @@ public class ObjectLockLegalHoldAcceptanceTests : IDisposable
         Assert.Equal("NoSuchKey", exception.ErrorCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectLegalHoldAsync_ToggleMultipleTimes_WorksCorrectly()
     {
         // Arrange
@@ -355,7 +355,7 @@ public class ObjectLockLegalHoldAcceptanceTests : IDisposable
         Assert.Equal("ON", finalResponse.LegalHold?.Status?.Value);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectLegalHoldAsync_AfterObjectRead_StatusPersists()
     {
         // Arrange

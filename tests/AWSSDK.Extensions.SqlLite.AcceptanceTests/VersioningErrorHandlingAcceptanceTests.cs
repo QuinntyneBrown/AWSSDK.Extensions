@@ -35,7 +35,7 @@ public class VersioningErrorHandlingAcceptanceTests : IDisposable
         }
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectAsync_NoSuchVersion_ThrowsNoSuchVersionException()
     {
         // Arrange
@@ -67,7 +67,7 @@ public class VersioningErrorHandlingAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectAsync_OnDeleteMarker_ThrowsMethodNotAllowedException()
     {
         // Arrange
@@ -100,7 +100,7 @@ public class VersioningErrorHandlingAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.MethodNotAllowed, exception.StatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectAsync_CurrentVersionIsDeleteMarker_ThrowsNoSuchKeyException()
     {
         // Arrange
@@ -128,7 +128,7 @@ public class VersioningErrorHandlingAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectAsync_ConcurrentWrites_AllSucceedWithSeparateVersions()
     {
         // Arrange
@@ -173,7 +173,7 @@ public class VersioningErrorHandlingAcceptanceTests : IDisposable
         Assert.Equal(5, fileVersions.Count);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetBucketVersioningAsync_NonExistentBucket_ThrowsNoSuchBucketException()
     {
         // Act & Assert
@@ -184,7 +184,7 @@ public class VersioningErrorHandlingAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutBucketVersioningAsync_NonExistentBucket_ThrowsNoSuchBucketException()
     {
         // Act & Assert
@@ -199,7 +199,7 @@ public class VersioningErrorHandlingAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task ListVersionsAsync_NonExistentBucket_ThrowsNoSuchBucketException()
     {
         // Act & Assert
@@ -210,7 +210,7 @@ public class VersioningErrorHandlingAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectMetadataAsync_NoSuchVersion_ThrowsException()
     {
         // Arrange
@@ -241,7 +241,7 @@ public class VersioningErrorHandlingAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task CopyObjectAsync_NoSuchSourceVersion_ThrowsException()
     {
         // Arrange
@@ -274,7 +274,7 @@ public class VersioningErrorHandlingAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectAsync_NonExistentObject_ThrowsNoSuchKeyException()
     {
         // Arrange
@@ -294,7 +294,7 @@ public class VersioningErrorHandlingAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task ErrorResponse_ContainsProperExceptionDetails()
     {
         // Act & Assert
@@ -306,7 +306,7 @@ public class VersioningErrorHandlingAcceptanceTests : IDisposable
         Assert.True(exception.StatusCode != 0);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteObjectAsync_NonExistentVersion_IsIdempotent()
     {
         // Arrange
@@ -337,7 +337,7 @@ public class VersioningErrorHandlingAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.HttpStatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task VersioningStatus_ProperlyReportedAfterOperations()
     {
         // Arrange

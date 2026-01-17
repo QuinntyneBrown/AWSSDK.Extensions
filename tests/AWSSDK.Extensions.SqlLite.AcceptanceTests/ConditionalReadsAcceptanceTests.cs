@@ -37,7 +37,7 @@ public class ConditionalReadsAcceptanceTests : IDisposable
 
     #region 3.1 GetObjectAsync with Conditional Headers
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectAsync_BasicGet_ReturnsContent()
     {
         // Arrange
@@ -65,7 +65,7 @@ public class ConditionalReadsAcceptanceTests : IDisposable
         Assert.Equal(content, readContent);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectAsync_IfMatch_ETagMismatch_Returns412()
     {
         // Arrange
@@ -92,7 +92,7 @@ public class ConditionalReadsAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.PreconditionFailed, exception.StatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectAsync_IfNoneMatch_ETagMatches_Returns304()
     {
         // Arrange
@@ -120,7 +120,7 @@ public class ConditionalReadsAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.NotModified, exception.StatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectAsync_ReturnsContentWhenETagsAreDifferent()
     {
         // Arrange
@@ -146,7 +146,7 @@ public class ConditionalReadsAcceptanceTests : IDisposable
         Assert.Equal(content, readContent);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectAsync_ReturnsLastModifiedTimestamp()
     {
         // Arrange
@@ -171,7 +171,7 @@ public class ConditionalReadsAcceptanceTests : IDisposable
         Assert.True(getResponse.LastModified <= afterPut.AddSeconds(1));
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectAsync_IfModifiedSince_ObjectNotModified_Returns304()
     {
         // Arrange
@@ -198,7 +198,7 @@ public class ConditionalReadsAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.NotModified, exception.StatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectAsync_ObjectMetadata_ContainsRequiredFields()
     {
         // Arrange
@@ -224,7 +224,7 @@ public class ConditionalReadsAcceptanceTests : IDisposable
         Assert.NotEqual(default, getResponse.LastModified);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectAsync_IfUnmodifiedSince_ObjectModified_Returns412()
     {
         // Arrange
@@ -255,7 +255,7 @@ public class ConditionalReadsAcceptanceTests : IDisposable
 
     #region GetObject with Versioning
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectAsync_WithVersionId_ReturnsSpecificVersion()
     {
         // Arrange
@@ -299,7 +299,7 @@ public class ConditionalReadsAcceptanceTests : IDisposable
         Assert.Equal("version 1 content", content);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectAsync_WithoutVersionId_ReturnsLatestVersion()
     {
         // Arrange
@@ -337,7 +337,7 @@ public class ConditionalReadsAcceptanceTests : IDisposable
         Assert.Equal("version 2 content", content);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectAsync_NonExistentObject_ThrowsException()
     {
         // Arrange
@@ -352,7 +352,7 @@ public class ConditionalReadsAcceptanceTests : IDisposable
         Assert.Equal("NoSuchKey", exception.ErrorCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectAsync_NonExistentBucket_ThrowsException()
     {
         // Act & Assert

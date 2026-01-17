@@ -42,7 +42,11 @@ public class SqlLiteS3Client : IAmazonS3, IDisposable
                 creation_date TEXT NOT NULL,
                 versioning_status TEXT,
                 mfa_delete_enabled INTEGER DEFAULT 0,
-                owner_id TEXT DEFAULT '123456789012'
+                owner_id TEXT DEFAULT '123456789012',
+                object_lock_enabled INTEGER DEFAULT 0,
+                object_lock_mode TEXT,
+                object_lock_days INTEGER,
+                object_lock_years INTEGER
             );
 
             CREATE TABLE IF NOT EXISTS objects (
@@ -57,6 +61,9 @@ public class SqlLiteS3Client : IAmazonS3, IDisposable
                 last_modified TEXT NOT NULL,
                 is_latest INTEGER DEFAULT 1,
                 metadata TEXT,
+                retention_mode TEXT,
+                retention_until TEXT,
+                legal_hold_status TEXT DEFAULT 'OFF',
                 FOREIGN KEY (bucket_name) REFERENCES buckets(bucket_name)
             );
 
@@ -73,6 +80,9 @@ public class SqlLiteS3Client : IAmazonS3, IDisposable
                 is_latest INTEGER DEFAULT 0,
                 is_delete_marker INTEGER DEFAULT 0,
                 metadata TEXT,
+                retention_mode TEXT,
+                retention_until TEXT,
+                legal_hold_status TEXT DEFAULT 'OFF',
                 FOREIGN KEY (bucket_name) REFERENCES buckets(bucket_name)
             );
 
@@ -91,6 +101,32 @@ public class SqlLiteS3Client : IAmazonS3, IDisposable
             CREATE INDEX IF NOT EXISTS idx_delete_markers_bucket_key ON delete_markers(bucket_name, key);
         ";
         cmd.ExecuteNonQuery();
+
+        // Add columns if they don't exist (for existing databases)
+        AddColumnIfNotExists("buckets", "object_lock_enabled", "INTEGER DEFAULT 0");
+        AddColumnIfNotExists("buckets", "object_lock_mode", "TEXT");
+        AddColumnIfNotExists("buckets", "object_lock_days", "INTEGER");
+        AddColumnIfNotExists("buckets", "object_lock_years", "INTEGER");
+        AddColumnIfNotExists("objects", "retention_mode", "TEXT");
+        AddColumnIfNotExists("objects", "retention_until", "TEXT");
+        AddColumnIfNotExists("objects", "legal_hold_status", "TEXT DEFAULT 'OFF'");
+        AddColumnIfNotExists("versions", "retention_mode", "TEXT");
+        AddColumnIfNotExists("versions", "retention_until", "TEXT");
+        AddColumnIfNotExists("versions", "legal_hold_status", "TEXT DEFAULT 'OFF'");
+    }
+
+    private void AddColumnIfNotExists(string tableName, string columnName, string columnDefinition)
+    {
+        try
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition}";
+            cmd.ExecuteNonQuery();
+        }
+        catch (SqliteException)
+        {
+            // Column already exists
+        }
     }
 
     #region Bucket Operations
@@ -1380,14 +1416,218 @@ public class SqlLiteS3Client : IAmazonS3, IDisposable
     public Task<CompleteMultipartUploadResponse> CompleteMultipartUploadAsync(CompleteMultipartUploadRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<CopyObjectResponse> CopyObjectAsync(string sourceBucket, string sourceKey, string destinationBucket, string destinationKey, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    public async Task<CopyObjectResponse> CopyObjectAsync(string sourceBucket, string sourceKey, string destinationBucket, string destinationKey, CancellationToken cancellationToken = default)
+    {
+        var request = new CopyObjectRequest
+        {
+            SourceBucket = sourceBucket,
+            SourceKey = sourceKey,
+            DestinationBucket = destinationBucket,
+            DestinationKey = destinationKey
+        };
+        return await CopyObjectAsync(request, cancellationToken);
+    }
 
-    public Task<CopyObjectResponse> CopyObjectAsync(string sourceBucket, string sourceKey, string sourceVersionId, string destinationBucket, string destinationKey, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    public async Task<CopyObjectResponse> CopyObjectAsync(string sourceBucket, string sourceKey, string sourceVersionId, string destinationBucket, string destinationKey, CancellationToken cancellationToken = default)
+    {
+        var request = new CopyObjectRequest
+        {
+            SourceBucket = sourceBucket,
+            SourceKey = sourceKey,
+            SourceVersionId = sourceVersionId,
+            DestinationBucket = destinationBucket,
+            DestinationKey = destinationKey
+        };
+        return await CopyObjectAsync(request, cancellationToken);
+    }
 
-    public Task<CopyObjectResponse> CopyObjectAsync(CopyObjectRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    public async Task<CopyObjectResponse> CopyObjectAsync(CopyObjectRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(async () =>
+        {
+            // Check if source bucket exists
+            using (var checkCmd = _connection.CreateCommand())
+            {
+                checkCmd.CommandText = "SELECT COUNT(*) FROM buckets WHERE bucket_name = @bucketName";
+                checkCmd.Parameters.AddWithValue("@bucketName", request.SourceBucket);
+                var count = Convert.ToInt64(checkCmd.ExecuteScalar());
+                if (count == 0)
+                {
+                    throw new AmazonS3Exception("Source bucket does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchBucket"
+                    };
+                }
+            }
+
+            // Check if destination bucket exists
+            string? destVersioningStatus;
+            using (var checkCmd = _connection.CreateCommand())
+            {
+                checkCmd.CommandText = "SELECT versioning_status FROM buckets WHERE bucket_name = @bucketName";
+                checkCmd.Parameters.AddWithValue("@bucketName", request.DestinationBucket);
+                var result = checkCmd.ExecuteScalar();
+                if (result == null)
+                {
+                    throw new AmazonS3Exception("Destination bucket does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchBucket"
+                    };
+                }
+                destVersioningStatus = result == DBNull.Value ? null : result.ToString();
+            }
+
+            // Check for delete marker at source if no version specified
+            if (string.IsNullOrEmpty(request.SourceVersionId))
+            {
+                using var dmCmd = _connection.CreateCommand();
+                dmCmd.CommandText = "SELECT COUNT(*) FROM delete_markers WHERE bucket_name = @bucketName AND key = @key AND is_latest = 1";
+                dmCmd.Parameters.AddWithValue("@bucketName", request.SourceBucket);
+                dmCmd.Parameters.AddWithValue("@key", request.SourceKey);
+                var dmCount = Convert.ToInt64(dmCmd.ExecuteScalar());
+                if (dmCount > 0)
+                {
+                    throw new AmazonS3Exception("Object does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchKey"
+                    };
+                }
+            }
+
+            // Get source object
+            byte[]? content = null;
+            string? contentType = null;
+            string? etag = null;
+            string? metadata = null;
+
+            if (!string.IsNullOrEmpty(request.SourceVersionId))
+            {
+                // Check for delete marker
+                using (var dmCmd = _connection.CreateCommand())
+                {
+                    dmCmd.CommandText = "SELECT COUNT(*) FROM delete_markers WHERE bucket_name = @bucketName AND key = @key AND version_id = @versionId";
+                    dmCmd.Parameters.AddWithValue("@bucketName", request.SourceBucket);
+                    dmCmd.Parameters.AddWithValue("@key", request.SourceKey);
+                    dmCmd.Parameters.AddWithValue("@versionId", request.SourceVersionId);
+                    var dmCount = Convert.ToInt64(dmCmd.ExecuteScalar());
+                    if (dmCount > 0)
+                    {
+                        throw new AmazonS3Exception("Cannot copy a delete marker")
+                        {
+                            StatusCode = HttpStatusCode.BadRequest,
+                            ErrorCode = "InvalidRequest"
+                        };
+                    }
+                }
+
+                // Try to get from versions
+                using var vCmd = _connection.CreateCommand();
+                vCmd.CommandText = "SELECT content, content_type, etag, metadata FROM versions WHERE bucket_name = @bucketName AND key = @key AND version_id = @versionId";
+                vCmd.Parameters.AddWithValue("@bucketName", request.SourceBucket);
+                vCmd.Parameters.AddWithValue("@key", request.SourceKey);
+                vCmd.Parameters.AddWithValue("@versionId", request.SourceVersionId);
+                using var vReader = vCmd.ExecuteReader();
+                if (vReader.Read())
+                {
+                    content = vReader.IsDBNull(0) ? null : (byte[])vReader["content"];
+                    contentType = vReader.IsDBNull(1) ? "application/octet-stream" : vReader.GetString(1);
+                    etag = vReader.IsDBNull(2) ? null : vReader.GetString(2);
+                    metadata = vReader.IsDBNull(3) ? null : vReader.GetString(3);
+                }
+                else
+                {
+                    vReader.Close();
+                    // Check current object
+                    using var oCmd = _connection.CreateCommand();
+                    oCmd.CommandText = "SELECT content, content_type, etag, metadata, version_id FROM objects WHERE bucket_name = @bucketName AND key = @key";
+                    oCmd.Parameters.AddWithValue("@bucketName", request.SourceBucket);
+                    oCmd.Parameters.AddWithValue("@key", request.SourceKey);
+                    using var oReader = oCmd.ExecuteReader();
+                    if (oReader.Read())
+                    {
+                        var currentVersionId = oReader.IsDBNull(4) ? null : oReader.GetString(4);
+                        if (currentVersionId == request.SourceVersionId)
+                        {
+                            content = oReader.IsDBNull(0) ? null : (byte[])oReader["content"];
+                            contentType = oReader.IsDBNull(1) ? "application/octet-stream" : oReader.GetString(1);
+                            etag = oReader.IsDBNull(2) ? null : oReader.GetString(2);
+                            metadata = oReader.IsDBNull(3) ? null : oReader.GetString(3);
+                        }
+                        else
+                        {
+                            throw new AmazonS3Exception("The specified version does not exist")
+                            {
+                                StatusCode = HttpStatusCode.NotFound,
+                                ErrorCode = "NoSuchVersion"
+                            };
+                        }
+                    }
+                    else
+                    {
+                        throw new AmazonS3Exception("The specified version does not exist")
+                        {
+                            StatusCode = HttpStatusCode.NotFound,
+                            ErrorCode = "NoSuchVersion"
+                        };
+                    }
+                }
+            }
+            else
+            {
+                // Get current object
+                using var cmd = _connection.CreateCommand();
+                cmd.CommandText = "SELECT content, content_type, etag, metadata FROM objects WHERE bucket_name = @bucketName AND key = @key";
+                cmd.Parameters.AddWithValue("@bucketName", request.SourceBucket);
+                cmd.Parameters.AddWithValue("@key", request.SourceKey);
+                using var reader = cmd.ExecuteReader();
+                if (!reader.Read())
+                {
+                    throw new AmazonS3Exception("Object does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchKey"
+                    };
+                }
+                content = reader.IsDBNull(0) ? null : (byte[])reader["content"];
+                contentType = reader.IsDBNull(1) ? "application/octet-stream" : reader.GetString(1);
+                etag = reader.IsDBNull(2) ? null : reader.GetString(2);
+                metadata = reader.IsDBNull(3) ? null : reader.GetString(3);
+            }
+
+            // Put the object to the destination
+            var putRequest = new PutObjectRequest
+            {
+                BucketName = request.DestinationBucket,
+                Key = request.DestinationKey,
+                ContentType = contentType,
+                InputStream = content != null ? new MemoryStream(content) : new MemoryStream()
+            };
+
+            if (!string.IsNullOrEmpty(metadata))
+            {
+                var metadataDict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(metadata);
+                if (metadataDict != null)
+                {
+                    foreach (var kvp in metadataDict)
+                    {
+                        putRequest.Metadata[kvp.Key] = kvp.Value;
+                    }
+                }
+            }
+
+            var putResponse = await PutObjectAsync(putRequest, cancellationToken);
+
+            return new CopyObjectResponse
+            {
+                ETag = putResponse.ETag,
+                VersionId = putResponse.VersionId,
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<CopyPartResponse> CopyPartAsync(string sourceBucket, string sourceKey, string destinationBucket, string destinationKey, string uploadId, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
@@ -1572,23 +1812,333 @@ public class SqlLiteS3Client : IAmazonS3, IDisposable
     public Task<GetObjectAttributesResponse> GetObjectAttributesAsync(GetObjectAttributesRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<GetObjectLegalHoldResponse> GetObjectLegalHoldAsync(GetObjectLegalHoldRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    public async Task<GetObjectLegalHoldResponse> GetObjectLegalHoldAsync(GetObjectLegalHoldRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            // Check bucket exists
+            using (var checkCmd = _connection.CreateCommand())
+            {
+                checkCmd.CommandText = "SELECT COUNT(*) FROM buckets WHERE bucket_name = @bucketName";
+                checkCmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+                var count = Convert.ToInt64(checkCmd.ExecuteScalar());
+                if (count == 0)
+                {
+                    throw new AmazonS3Exception("Bucket does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchBucket"
+                    };
+                }
+            }
 
-    public Task<GetObjectLockConfigurationResponse> GetObjectLockConfigurationAsync(GetObjectLockConfigurationRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            // Get object legal hold status
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "SELECT legal_hold_status FROM objects WHERE bucket_name = @bucketName AND key = @key";
+            cmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+            cmd.Parameters.AddWithValue("@key", request.Key);
+            var result = cmd.ExecuteScalar();
+            if (result == null)
+            {
+                throw new AmazonS3Exception("Object does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchKey"
+                };
+            }
 
-    public Task<GetObjectMetadataResponse> GetObjectMetadataAsync(string bucketName, string key, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            var status = result == DBNull.Value ? "OFF" : result.ToString();
 
-    public Task<GetObjectMetadataResponse> GetObjectMetadataAsync(string bucketName, string key, string versionId, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            return new GetObjectLegalHoldResponse
+            {
+                LegalHold = new ObjectLockLegalHold
+                {
+                    Status = status == "ON" ? ObjectLockLegalHoldStatus.On : ObjectLockLegalHoldStatus.Off
+                },
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
-    public Task<GetObjectMetadataResponse> GetObjectMetadataAsync(GetObjectMetadataRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    public async Task<GetObjectLockConfigurationResponse> GetObjectLockConfigurationAsync(GetObjectLockConfigurationRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "SELECT object_lock_enabled, object_lock_mode, object_lock_days, object_lock_years FROM buckets WHERE bucket_name = @bucketName";
+            cmd.Parameters.AddWithValue("@bucketName", request.BucketName);
 
-    public Task<GetObjectRetentionResponse> GetObjectRetentionAsync(GetObjectRetentionRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read())
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            var objectLockEnabled = !reader.IsDBNull(0) && reader.GetInt64(0) == 1;
+            if (!objectLockEnabled)
+            {
+                throw new AmazonS3Exception("Object Lock configuration does not exist for this bucket")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "ObjectLockConfigurationNotFoundError"
+                };
+            }
+
+            var mode = reader.IsDBNull(1) ? null : reader.GetString(1);
+            var days = reader.IsDBNull(2) ? (int?)null : (int)reader.GetInt64(2);
+            var years = reader.IsDBNull(3) ? (int?)null : (int)reader.GetInt64(3);
+
+            var config = new ObjectLockConfiguration
+            {
+                ObjectLockEnabled = ObjectLockEnabled.Enabled
+            };
+
+            if (!string.IsNullOrEmpty(mode))
+            {
+                config.Rule = new ObjectLockRule
+                {
+                    DefaultRetention = new DefaultRetention
+                    {
+                        Mode = mode == "GOVERNANCE" ? ObjectLockRetentionMode.Governance : ObjectLockRetentionMode.Compliance,
+                        Days = days ?? 0,
+                        Years = years ?? 0
+                    }
+                };
+            }
+
+            return new GetObjectLockConfigurationResponse
+            {
+                ObjectLockConfiguration = config,
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
+
+    public async Task<GetObjectMetadataResponse> GetObjectMetadataAsync(string bucketName, string key, CancellationToken cancellationToken = default)
+    {
+        var request = new GetObjectMetadataRequest { BucketName = bucketName, Key = key };
+        return await GetObjectMetadataAsync(request, cancellationToken);
+    }
+
+    public async Task<GetObjectMetadataResponse> GetObjectMetadataAsync(string bucketName, string key, string versionId, CancellationToken cancellationToken = default)
+    {
+        var request = new GetObjectMetadataRequest { BucketName = bucketName, Key = key, VersionId = versionId };
+        return await GetObjectMetadataAsync(request, cancellationToken);
+    }
+
+    public async Task<GetObjectMetadataResponse> GetObjectMetadataAsync(GetObjectMetadataRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            // Check bucket exists
+            using (var checkCmd = _connection.CreateCommand())
+            {
+                checkCmd.CommandText = "SELECT COUNT(*) FROM buckets WHERE bucket_name = @bucketName";
+                checkCmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+                var count = Convert.ToInt64(checkCmd.ExecuteScalar());
+                if (count == 0)
+                {
+                    throw new AmazonS3Exception("Bucket does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchBucket"
+                    };
+                }
+            }
+
+            // Handle specific version request
+            if (!string.IsNullOrEmpty(request.VersionId))
+            {
+                // Check for delete marker
+                using (var dmCmd = _connection.CreateCommand())
+                {
+                    dmCmd.CommandText = "SELECT last_modified FROM delete_markers WHERE bucket_name = @bucketName AND key = @key AND version_id = @versionId";
+                    dmCmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+                    dmCmd.Parameters.AddWithValue("@key", request.Key);
+                    dmCmd.Parameters.AddWithValue("@versionId", request.VersionId);
+                    using var dmReader = dmCmd.ExecuteReader();
+                    if (dmReader.Read())
+                    {
+                        var lastModified = DateTime.Parse(dmReader.GetString(0));
+                        var response = new GetObjectMetadataResponse
+                        {
+                            VersionId = request.VersionId,
+                            DeleteMarker = "true",
+                            LastModified = lastModified,
+                            HttpStatusCode = HttpStatusCode.OK
+                        };
+                        return response;
+                    }
+                }
+
+                // Check versions table
+                using (var vCmd = _connection.CreateCommand())
+                {
+                    vCmd.CommandText = "SELECT content_type, size, etag, last_modified, metadata FROM versions WHERE bucket_name = @bucketName AND key = @key AND version_id = @versionId";
+                    vCmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+                    vCmd.Parameters.AddWithValue("@key", request.Key);
+                    vCmd.Parameters.AddWithValue("@versionId", request.VersionId);
+                    using var vReader = vCmd.ExecuteReader();
+                    if (vReader.Read())
+                    {
+                        return BuildMetadataResponse(vReader, request.VersionId);
+                    }
+                }
+
+                // Check current object
+                using (var oCmd = _connection.CreateCommand())
+                {
+                    oCmd.CommandText = "SELECT content_type, size, etag, last_modified, metadata, version_id FROM objects WHERE bucket_name = @bucketName AND key = @key";
+                    oCmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+                    oCmd.Parameters.AddWithValue("@key", request.Key);
+                    using var oReader = oCmd.ExecuteReader();
+                    if (oReader.Read())
+                    {
+                        var currentVersionId = oReader.IsDBNull(5) ? null : oReader.GetString(5);
+                        if (currentVersionId == request.VersionId)
+                        {
+                            return BuildMetadataResponse(oReader, request.VersionId);
+                        }
+                    }
+                }
+
+                throw new AmazonS3Exception("The specified version does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchVersion"
+                };
+            }
+
+            // Check for delete marker on current version
+            using (var dmCmd = _connection.CreateCommand())
+            {
+                dmCmd.CommandText = "SELECT COUNT(*) FROM delete_markers WHERE bucket_name = @bucketName AND key = @key AND is_latest = 1";
+                dmCmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+                dmCmd.Parameters.AddWithValue("@key", request.Key);
+                var dmCount = Convert.ToInt64(dmCmd.ExecuteScalar());
+                if (dmCount > 0)
+                {
+                    throw new AmazonS3Exception("Object does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchKey"
+                    };
+                }
+            }
+
+            // Get current object
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "SELECT content_type, size, etag, last_modified, metadata, version_id FROM objects WHERE bucket_name = @bucketName AND key = @key";
+            cmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+            cmd.Parameters.AddWithValue("@key", request.Key);
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read())
+            {
+                throw new AmazonS3Exception("Object does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchKey"
+                };
+            }
+
+            var versionId = reader.IsDBNull(5) ? null : reader.GetString(5);
+            return BuildMetadataResponse(reader, versionId);
+        }, cancellationToken);
+    }
+
+    private GetObjectMetadataResponse BuildMetadataResponse(SqliteDataReader reader, string? versionId)
+    {
+        var contentType = reader.IsDBNull(0) ? "application/octet-stream" : reader.GetString(0);
+        var size = reader.GetInt64(1);
+        var etag = reader.IsDBNull(2) ? null : reader.GetString(2);
+        var lastModified = DateTime.Parse(reader.GetString(3));
+        var metadataJson = reader.IsDBNull(4) ? null : reader.GetString(4);
+
+        var response = new GetObjectMetadataResponse
+        {
+            ContentLength = size,
+            ETag = etag,
+            LastModified = lastModified,
+            VersionId = versionId,
+            HttpStatusCode = HttpStatusCode.OK
+        };
+
+        response.Headers.ContentType = contentType;
+
+        if (!string.IsNullOrEmpty(metadataJson))
+        {
+            var metadata = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson);
+            if (metadata != null)
+            {
+                foreach (var kvp in metadata)
+                {
+                    response.Metadata[kvp.Key] = kvp.Value;
+                }
+            }
+        }
+
+        return response;
+    }
+
+    public async Task<GetObjectRetentionResponse> GetObjectRetentionAsync(GetObjectRetentionRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            // Check bucket exists
+            using (var checkCmd = _connection.CreateCommand())
+            {
+                checkCmd.CommandText = "SELECT COUNT(*) FROM buckets WHERE bucket_name = @bucketName";
+                checkCmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+                var count = Convert.ToInt64(checkCmd.ExecuteScalar());
+                if (count == 0)
+                {
+                    throw new AmazonS3Exception("Bucket does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchBucket"
+                    };
+                }
+            }
+
+            // Get object retention
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "SELECT retention_mode, retention_until FROM objects WHERE bucket_name = @bucketName AND key = @key";
+            cmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+            cmd.Parameters.AddWithValue("@key", request.Key);
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read())
+            {
+                throw new AmazonS3Exception("Object does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchKey"
+                };
+            }
+
+            var mode = reader.IsDBNull(0) ? null : reader.GetString(0);
+            var until = reader.IsDBNull(1) ? null : reader.GetString(1);
+
+            ObjectLockRetention? retention = null;
+            if (!string.IsNullOrEmpty(mode) && !string.IsNullOrEmpty(until))
+            {
+                retention = new ObjectLockRetention
+                {
+                    Mode = mode == "GOVERNANCE" ? ObjectLockRetentionMode.Governance : ObjectLockRetentionMode.Compliance,
+                    RetainUntilDate = DateTime.Parse(until)
+                };
+            }
+
+            return new GetObjectRetentionResponse
+            {
+                Retention = retention,
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<Stream> GetObjectStreamAsync(string bucketName, string objectKey, IDictionary<string, object> additionalProperties, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
@@ -1641,14 +2191,104 @@ public class SqlLiteS3Client : IAmazonS3, IDisposable
     public Task<ListMultipartUploadsResponse> ListMultipartUploadsAsync(ListMultipartUploadsRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<ListObjectsResponse> ListObjectsAsync(string bucketName, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    public async Task<ListObjectsResponse> ListObjectsAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        var request = new ListObjectsRequest { BucketName = bucketName };
+        return await ListObjectsAsync(request, cancellationToken);
+    }
 
-    public Task<ListObjectsResponse> ListObjectsAsync(string bucketName, string prefix, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    public async Task<ListObjectsResponse> ListObjectsAsync(string bucketName, string prefix, CancellationToken cancellationToken = default)
+    {
+        var request = new ListObjectsRequest { BucketName = bucketName, Prefix = prefix };
+        return await ListObjectsAsync(request, cancellationToken);
+    }
 
-    public Task<ListObjectsResponse> ListObjectsAsync(ListObjectsRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    public async Task<ListObjectsResponse> ListObjectsAsync(ListObjectsRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            // Check bucket exists
+            using (var checkCmd = _connection.CreateCommand())
+            {
+                checkCmd.CommandText = "SELECT COUNT(*) FROM buckets WHERE bucket_name = @bucketName";
+                checkCmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+                var count = Convert.ToInt64(checkCmd.ExecuteScalar());
+                if (count == 0)
+                {
+                    throw new AmazonS3Exception("Bucket does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchBucket"
+                    };
+                }
+            }
+
+            // Get all keys that have delete markers as latest
+            var deletedKeys = new HashSet<string>();
+            using (var dmCmd = _connection.CreateCommand())
+            {
+                dmCmd.CommandText = "SELECT key FROM delete_markers WHERE bucket_name = @bucketName AND is_latest = 1";
+                dmCmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+                using var dmReader = dmCmd.ExecuteReader();
+                while (dmReader.Read())
+                {
+                    deletedKeys.Add(dmReader.GetString(0));
+                }
+            }
+
+            // Get objects that are not deleted
+            var objects = new List<S3Object>();
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "SELECT key, size, etag, last_modified FROM objects WHERE bucket_name = @bucketName";
+            cmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var key = reader.GetString(0);
+
+                // Skip if this key has a delete marker as latest
+                if (deletedKeys.Contains(key))
+                    continue;
+
+                // Apply prefix filter
+                if (!string.IsNullOrEmpty(request.Prefix) && !key.StartsWith(request.Prefix))
+                    continue;
+
+                objects.Add(new S3Object
+                {
+                    BucketName = request.BucketName,
+                    Key = key,
+                    Size = reader.GetInt64(1),
+                    ETag = reader.IsDBNull(2) ? null : reader.GetString(2),
+                    LastModified = DateTime.Parse(reader.GetString(3)),
+                    StorageClass = S3StorageClass.Standard
+                });
+            }
+
+            // Sort and limit
+            objects = objects
+                .OrderBy(o => o.Key)
+                .ToList();
+
+            var maxKeys = request.MaxKeys > 0 ? request.MaxKeys : 1000;
+            var isTruncated = objects.Count > maxKeys;
+            if (isTruncated)
+            {
+                objects = objects.Take(maxKeys).ToList();
+            }
+
+            return new ListObjectsResponse
+            {
+                Name = request.BucketName,
+                Prefix = request.Prefix,
+                S3Objects = objects,
+                IsTruncated = isTruncated,
+                MaxKeys = maxKeys,
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<ListObjectsV2Response> ListObjectsV2Async(ListObjectsV2Request request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
@@ -1734,14 +2374,161 @@ public class SqlLiteS3Client : IAmazonS3, IDisposable
     public Task<PutLifecycleConfigurationResponse> PutLifecycleConfigurationAsync(PutLifecycleConfigurationRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<PutObjectLegalHoldResponse> PutObjectLegalHoldAsync(PutObjectLegalHoldRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    public async Task<PutObjectLegalHoldResponse> PutObjectLegalHoldAsync(PutObjectLegalHoldRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            // Check bucket exists
+            using (var checkCmd = _connection.CreateCommand())
+            {
+                checkCmd.CommandText = "SELECT COUNT(*) FROM buckets WHERE bucket_name = @bucketName";
+                checkCmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+                var count = Convert.ToInt64(checkCmd.ExecuteScalar());
+                if (count == 0)
+                {
+                    throw new AmazonS3Exception("Bucket does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchBucket"
+                    };
+                }
+            }
 
-    public Task<PutObjectLockConfigurationResponse> PutObjectLockConfigurationAsync(PutObjectLockConfigurationRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            // Check object exists
+            using (var objCmd = _connection.CreateCommand())
+            {
+                objCmd.CommandText = "SELECT COUNT(*) FROM objects WHERE bucket_name = @bucketName AND key = @key";
+                objCmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+                objCmd.Parameters.AddWithValue("@key", request.Key);
+                var count = Convert.ToInt64(objCmd.ExecuteScalar());
+                if (count == 0)
+                {
+                    throw new AmazonS3Exception("Object does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchKey"
+                    };
+                }
+            }
 
-    public Task<PutObjectRetentionResponse> PutObjectRetentionAsync(PutObjectRetentionRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+            // Update legal hold status
+            var status = request.LegalHold?.Status?.Value == "ON" ? "ON" : "OFF";
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "UPDATE objects SET legal_hold_status = @status WHERE bucket_name = @bucketName AND key = @key";
+            cmd.Parameters.AddWithValue("@status", status);
+            cmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+            cmd.Parameters.AddWithValue("@key", request.Key);
+            cmd.ExecuteNonQuery();
+
+            return new PutObjectLegalHoldResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
+
+    public async Task<PutObjectLockConfigurationResponse> PutObjectLockConfigurationAsync(PutObjectLockConfigurationRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            // Check bucket exists
+            using (var checkCmd = _connection.CreateCommand())
+            {
+                checkCmd.CommandText = "SELECT COUNT(*) FROM buckets WHERE bucket_name = @bucketName";
+                checkCmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+                var count = Convert.ToInt64(checkCmd.ExecuteScalar());
+                if (count == 0)
+                {
+                    throw new AmazonS3Exception("Bucket does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchBucket"
+                    };
+                }
+            }
+
+            var config = request.ObjectLockConfiguration;
+            var enabled = config?.ObjectLockEnabled?.Value == "Enabled" ? 1 : 0;
+            var mode = config?.Rule?.DefaultRetention?.Mode?.Value;
+            var days = config?.Rule?.DefaultRetention?.Days;
+            var years = config?.Rule?.DefaultRetention?.Years;
+
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = @"UPDATE buckets SET
+                object_lock_enabled = @enabled,
+                object_lock_mode = @mode,
+                object_lock_days = @days,
+                object_lock_years = @years
+                WHERE bucket_name = @bucketName";
+            cmd.Parameters.AddWithValue("@enabled", enabled);
+            cmd.Parameters.AddWithValue("@mode", (object?)mode ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@days", days.HasValue && days.Value > 0 ? (object)days.Value : DBNull.Value);
+            cmd.Parameters.AddWithValue("@years", years.HasValue && years.Value > 0 ? (object)years.Value : DBNull.Value);
+            cmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+            cmd.ExecuteNonQuery();
+
+            return new PutObjectLockConfigurationResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
+
+    public async Task<PutObjectRetentionResponse> PutObjectRetentionAsync(PutObjectRetentionRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            // Check bucket exists
+            using (var checkCmd = _connection.CreateCommand())
+            {
+                checkCmd.CommandText = "SELECT COUNT(*) FROM buckets WHERE bucket_name = @bucketName";
+                checkCmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+                var count = Convert.ToInt64(checkCmd.ExecuteScalar());
+                if (count == 0)
+                {
+                    throw new AmazonS3Exception("Bucket does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchBucket"
+                    };
+                }
+            }
+
+            // Check object exists
+            using (var objCmd = _connection.CreateCommand())
+            {
+                objCmd.CommandText = "SELECT COUNT(*) FROM objects WHERE bucket_name = @bucketName AND key = @key";
+                objCmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+                objCmd.Parameters.AddWithValue("@key", request.Key);
+                var count = Convert.ToInt64(objCmd.ExecuteScalar());
+                if (count == 0)
+                {
+                    throw new AmazonS3Exception("Object does not exist")
+                    {
+                        StatusCode = HttpStatusCode.NotFound,
+                        ErrorCode = "NoSuchKey"
+                    };
+                }
+            }
+
+            // Update retention
+            var mode = request.Retention?.Mode?.Value;
+            var until = request.Retention?.RetainUntilDate?.ToString("o");
+
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "UPDATE objects SET retention_mode = @mode, retention_until = @until WHERE bucket_name = @bucketName AND key = @key";
+            cmd.Parameters.AddWithValue("@mode", (object?)mode ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@until", (object?)until ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+            cmd.Parameters.AddWithValue("@key", request.Key);
+            cmd.ExecuteNonQuery();
+
+            return new PutObjectRetentionResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     public Task<PutObjectTaggingResponse> PutObjectTaggingAsync(PutObjectTaggingRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
@@ -1779,11 +2566,35 @@ public class SqlLiteS3Client : IAmazonS3, IDisposable
     public Task<WriteGetObjectResponseResponse> WriteGetObjectResponseAsync(WriteGetObjectResponseRequest request, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
-    public Task<HeadBucketResponse> HeadBucketAsync(string bucketName, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    public async Task<HeadBucketResponse> HeadBucketAsync(string bucketName, CancellationToken cancellationToken = default)
+    {
+        var request = new HeadBucketRequest { BucketName = bucketName };
+        return await HeadBucketAsync(request, cancellationToken);
+    }
 
-    public Task<HeadBucketResponse> HeadBucketAsync(HeadBucketRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
+    public async Task<HeadBucketResponse> HeadBucketAsync(HeadBucketRequest request, CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM buckets WHERE bucket_name = @bucketName";
+            cmd.Parameters.AddWithValue("@bucketName", request.BucketName);
+            var count = Convert.ToInt64(cmd.ExecuteScalar());
+            if (count == 0)
+            {
+                throw new AmazonS3Exception("Bucket does not exist")
+                {
+                    StatusCode = HttpStatusCode.NotFound,
+                    ErrorCode = "NoSuchBucket"
+                };
+            }
+
+            return new HeadBucketResponse
+            {
+                HttpStatusCode = HttpStatusCode.OK
+            };
+        }, cancellationToken);
+    }
 
     #endregion
 }

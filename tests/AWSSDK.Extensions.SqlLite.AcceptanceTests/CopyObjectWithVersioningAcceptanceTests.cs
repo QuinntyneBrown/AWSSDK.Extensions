@@ -35,7 +35,7 @@ public class CopyObjectWithVersioningAcceptanceTests : IDisposable
         }
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task CopyObjectAsync_SpecificVersion_CopiesToNewKey()
     {
         var bucketName = "versioned-bucket";
@@ -78,7 +78,7 @@ public class CopyObjectWithVersioningAcceptanceTests : IDisposable
         Assert.Equal("version1 content", content);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task CopyObjectAsync_WithoutVersionId_CopiesCurrentVersion()
     {
         var bucketName = "versioned-bucket";
@@ -118,7 +118,7 @@ public class CopyObjectWithVersioningAcceptanceTests : IDisposable
         Assert.Equal("version2 content", content);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task CopyObjectAsync_ExistingDestination_CreatesNewVersion()
     {
         var bucketName = "versioned-bucket";
@@ -162,7 +162,7 @@ public class CopyObjectWithVersioningAcceptanceTests : IDisposable
         Assert.Equal(copyResponse.VersionId, currentVersion.VersionId);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task CopyObjectAsync_ToNonVersionedBucket_HasNullVersionId()
     {
         var sourceBucket = "source-bucket";
@@ -202,7 +202,7 @@ public class CopyObjectWithVersioningAcceptanceTests : IDisposable
         Assert.Equal("source content", content);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task CopyObjectAsync_DeleteMarkerAsCurrent_ThrowsNoSuchKeyException()
     {
         var bucketName = "versioned-bucket";
@@ -234,7 +234,7 @@ public class CopyObjectWithVersioningAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task CopyObjectAsync_PreservesMetadataFromSourceVersion()
     {
         var bucketName = "versioned-bucket";
@@ -268,7 +268,7 @@ public class CopyObjectWithVersioningAcceptanceTests : IDisposable
         Assert.Equal("text/plain", metadata.Headers.ContentType);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task CopyObjectAsync_BetweenVersionedBuckets_CreatesNewVersion()
     {
         var sourceBucket = "source-bucket";
@@ -314,7 +314,7 @@ public class CopyObjectWithVersioningAcceptanceTests : IDisposable
         Assert.Equal("source content", content);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task CopyObjectAsync_ReturnsETag()
     {
         var bucketName = "versioned-bucket";
