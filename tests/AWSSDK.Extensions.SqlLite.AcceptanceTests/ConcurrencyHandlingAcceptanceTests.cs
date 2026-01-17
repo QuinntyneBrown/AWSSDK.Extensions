@@ -37,7 +37,7 @@ public class ConcurrencyHandlingAcceptanceTests : IDisposable
 
     #region 8.1 Optimistic Concurrency Patterns
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task ReadModifyWrite_BasicPattern_Succeeds()
     {
         // Arrange
@@ -81,7 +81,7 @@ public class ConcurrencyHandlingAcceptanceTests : IDisposable
         Assert.Equal(modifiedContent, verifiedContent);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task VersioningConcurrency_MultipleWrites_AllVersionsPreserved()
     {
         // Arrange
@@ -140,7 +140,7 @@ public class ConcurrencyHandlingAcceptanceTests : IDisposable
         Assert.Equal("version 3 content from Client B", content);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task ConcurrentCreation_FirstWriteWins()
     {
         // Arrange
@@ -175,7 +175,7 @@ public class ConcurrencyHandlingAcceptanceTests : IDisposable
 
     #region 8.2 Conflict Response Handling
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectAsync_AfterDelete_Returns404()
     {
         // Arrange
@@ -199,7 +199,7 @@ public class ConcurrencyHandlingAcceptanceTests : IDisposable
         Assert.Equal("NoSuchKey", exception.ErrorCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task ParallelReads_SameObject_AllSucceed()
     {
         // Arrange
@@ -234,7 +234,7 @@ public class ConcurrencyHandlingAcceptanceTests : IDisposable
         }
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task InterleavedReadWrite_VersionedBucket_PreservesAllVersions()
     {
         // Arrange
@@ -280,7 +280,7 @@ public class ConcurrencyHandlingAcceptanceTests : IDisposable
         Assert.Equal("updated content", content);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task MultipleUpdates_ETagChangesEachTime()
     {
         // Arrange
@@ -305,7 +305,7 @@ public class ConcurrencyHandlingAcceptanceTests : IDisposable
         Assert.Equal(5, etags.Distinct().Count());
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task VersionOrdering_IsPreserved()
     {
         // Arrange

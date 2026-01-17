@@ -35,7 +35,7 @@ public class DeleteMarkerBehaviorAcceptanceTests : IDisposable
         }
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteMarker_Properties_HasCorrectAttributes()
     {
         var bucketName = "versioned-bucket";
@@ -66,7 +66,7 @@ public class DeleteMarkerBehaviorAcceptanceTests : IDisposable
         Assert.NotEqual(default, deleteMarker.LastModified);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task ListObjectsAsync_DoesNotReturnDeletedObjects()
     {
         var bucketName = "versioned-bucket";
@@ -98,7 +98,7 @@ public class DeleteMarkerBehaviorAcceptanceTests : IDisposable
         Assert.DoesNotContain(listResponse.S3Objects, o => o.Key == "deleted-file.txt");
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteMarker_OnlyRemainingVersion_IsExpiredDeleteMarker()
     {
         var bucketName = "versioned-bucket";
@@ -135,7 +135,7 @@ public class DeleteMarkerBehaviorAcceptanceTests : IDisposable
         Assert.True(deleteMarkers[0].IsLatest);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteMarker_MultipleDeleteMarkers_OnlyMostRecentIsLatest()
     {
         var bucketName = "versioned-bucket";
@@ -168,7 +168,7 @@ public class DeleteMarkerBehaviorAcceptanceTests : IDisposable
         Assert.Equal(deleteResponse2.VersionId, latestMarker.VersionId);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteMarker_HasCorrectLastModifiedTimestamp()
     {
         var bucketName = "versioned-bucket";
@@ -199,7 +199,7 @@ public class DeleteMarkerBehaviorAcceptanceTests : IDisposable
         Assert.True(deleteMarker.LastModified <= afterDelete.AddSeconds(1));
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteMarker_CanBeIdentifiedInVersionListing()
     {
         var bucketName = "versioned-bucket";
@@ -228,7 +228,7 @@ public class DeleteMarkerBehaviorAcceptanceTests : IDisposable
         Assert.Contains(listResponse.Versions, v => v.Key == "file3.txt" && !v.IsDeleteMarker);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteMarker_KeyMatchesDeletedObjectKey()
     {
         var bucketName = "versioned-bucket";

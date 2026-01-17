@@ -37,7 +37,7 @@ public class ObjectLockConfigurationAcceptanceTests : IDisposable
 
     #region 7.1 PutObjectLockConfigurationAsync
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectLockConfigurationAsync_DefaultRetentionDays_SetsConfiguration()
     {
         // Arrange
@@ -75,7 +75,7 @@ public class ObjectLockConfigurationAcceptanceTests : IDisposable
         Assert.Equal(30, getResponse.ObjectLockConfiguration?.Rule?.DefaultRetention?.Days);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectLockConfigurationAsync_DefaultRetentionYears_SetsConfiguration()
     {
         // Arrange
@@ -113,7 +113,7 @@ public class ObjectLockConfigurationAcceptanceTests : IDisposable
         Assert.Equal(7, getResponse.ObjectLockConfiguration?.Rule?.DefaultRetention?.Years);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectLockConfigurationAsync_RemoveDefaultRetention_Succeeds()
     {
         // Arrange
@@ -161,7 +161,7 @@ public class ObjectLockConfigurationAcceptanceTests : IDisposable
         Assert.Null(getResponse.ObjectLockConfiguration?.Rule);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectLockConfigurationAsync_NonExistentBucket_ThrowsException()
     {
         // Act & Assert
@@ -183,7 +183,7 @@ public class ObjectLockConfigurationAcceptanceTests : IDisposable
 
     #region 7.2 GetObjectLockConfigurationAsync
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectLockConfigurationAsync_WithDefaults_ReturnsConfiguration()
     {
         // Arrange
@@ -220,7 +220,7 @@ public class ObjectLockConfigurationAcceptanceTests : IDisposable
         Assert.Equal(30, response.ObjectLockConfiguration?.Rule?.DefaultRetention?.Days);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectLockConfigurationAsync_WithoutDefaults_ReturnsEnabledOnlyConfiguration()
     {
         // Arrange
@@ -248,7 +248,7 @@ public class ObjectLockConfigurationAcceptanceTests : IDisposable
         Assert.Null(response.ObjectLockConfiguration?.Rule);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectLockConfigurationAsync_NoBucketLockConfig_ThrowsException()
     {
         // Arrange
@@ -266,7 +266,7 @@ public class ObjectLockConfigurationAcceptanceTests : IDisposable
         Assert.Equal("ObjectLockConfigurationNotFoundError", exception.ErrorCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectLockConfigurationAsync_NonExistentBucket_ThrowsException()
     {
         // Act & Assert
@@ -280,7 +280,7 @@ public class ObjectLockConfigurationAcceptanceTests : IDisposable
         Assert.Equal("NoSuchBucket", exception.ErrorCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectLockConfigurationAsync_UpdateConfiguration_Succeeds()
     {
         // Arrange

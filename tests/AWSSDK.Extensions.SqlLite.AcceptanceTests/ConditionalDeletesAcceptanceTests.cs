@@ -37,7 +37,7 @@ public class ConditionalDeletesAcceptanceTests : IDisposable
 
     #region 4.1 DeleteObjectAsync with If-Match
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteObjectAsync_BasicDelete_DeletesObject()
     {
         // Arrange
@@ -62,7 +62,7 @@ public class ConditionalDeletesAcceptanceTests : IDisposable
         Assert.Equal("NoSuchKey", exception.ErrorCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteObjectAsync_IfMatch_ETagMismatch_Returns412()
     {
         // Arrange
@@ -89,7 +89,7 @@ public class ConditionalDeletesAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.PreconditionFailed, exception.StatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteObjectAsync_ExistingObject_DeletesSuccessfully()
     {
         // Arrange
@@ -117,7 +117,7 @@ public class ConditionalDeletesAcceptanceTests : IDisposable
         Assert.Equal("NoSuchKey", exception.ErrorCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteObjectAsync_NonExistentObject_SucceedsIdempotently()
     {
         // Arrange
@@ -135,7 +135,7 @@ public class ConditionalDeletesAcceptanceTests : IDisposable
 
     #region Delete Operations with Versioning
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteObjectAsync_VersionedBucket_CreatesDeleteMarker()
     {
         // Arrange
@@ -172,7 +172,7 @@ public class ConditionalDeletesAcceptanceTests : IDisposable
         Assert.NotNull(originalVersion);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteObjectAsync_WithVersionId_PermanentlyDeletesVersion()
     {
         // Arrange
@@ -207,7 +207,7 @@ public class ConditionalDeletesAcceptanceTests : IDisposable
         Assert.DoesNotContain(versions, v => v.VersionId == putResponse.VersionId);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteObjectAsync_DeleteMarker_RemovingItRestoresObject()
     {
         // Arrange
@@ -250,7 +250,7 @@ public class ConditionalDeletesAcceptanceTests : IDisposable
         Assert.Equal("content", content);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteObjectAsync_MultipleVersions_CanDeleteAllVersions()
     {
         // Arrange
@@ -291,7 +291,7 @@ public class ConditionalDeletesAcceptanceTests : IDisposable
         Assert.Empty(remainingVersions);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteObjectAsync_NonExistentBucket_ThrowsException()
     {
         // Act & Assert

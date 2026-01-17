@@ -37,7 +37,7 @@ public class ErrorHandlingPartialFailuresAcceptanceTests : IDisposable
 
     #region 9.1 Batch Operation Error Handling
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteObjectsAsync_BatchDelete_ReturnsDeletedAndErrorsCollections()
     {
         // Arrange
@@ -71,7 +71,7 @@ public class ErrorHandlingPartialFailuresAcceptanceTests : IDisposable
         Assert.Empty(response.DeleteErrors);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteObjectsAsync_EmptyBucket_ProcessesAll()
     {
         // Arrange
@@ -92,7 +92,7 @@ public class ErrorHandlingPartialFailuresAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.HttpStatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteObjectsAsync_Response_HasCorrectStructure()
     {
         // Arrange
@@ -124,7 +124,7 @@ public class ErrorHandlingPartialFailuresAcceptanceTests : IDisposable
 
     #region 9.2 Object Lock Error Handling
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteObjectAsync_ObjectUnderRetention_ThrowsAccessDenied()
     {
         // Arrange
@@ -176,7 +176,7 @@ public class ErrorHandlingPartialFailuresAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.Forbidden, exception.StatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteObjectAsync_ObjectWithLegalHold_ThrowsAccessDenied()
     {
         // Arrange
@@ -218,7 +218,7 @@ public class ErrorHandlingPartialFailuresAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.Forbidden, exception.StatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectAsync_ObjectWithRetention_CreatesNewVersion()
     {
         // Arrange
@@ -272,7 +272,7 @@ public class ErrorHandlingPartialFailuresAcceptanceTests : IDisposable
 
     #region General Error Handling
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectAsync_NonExistentBucket_ReturnsNoSuchBucket()
     {
         // Act & Assert
@@ -283,7 +283,7 @@ public class ErrorHandlingPartialFailuresAcceptanceTests : IDisposable
         Assert.Equal("NoSuchBucket", exception.ErrorCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectAsync_NonExistentObject_ReturnsNoSuchKey()
     {
         // Arrange
@@ -298,7 +298,7 @@ public class ErrorHandlingPartialFailuresAcceptanceTests : IDisposable
         Assert.Equal("NoSuchKey", exception.ErrorCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectAsync_NonExistentBucket_ReturnsNoSuchBucket()
     {
         // Act & Assert
@@ -314,7 +314,7 @@ public class ErrorHandlingPartialFailuresAcceptanceTests : IDisposable
         Assert.Equal("NoSuchBucket", exception.ErrorCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteBucketAsync_NonEmptyBucket_ReturnsBucketNotEmpty()
     {
         // Arrange
@@ -336,7 +336,7 @@ public class ErrorHandlingPartialFailuresAcceptanceTests : IDisposable
         Assert.Equal("BucketNotEmpty", exception.ErrorCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutBucketAsync_ExistingBucketName_ReturnsBucketAlreadyExists()
     {
         // Arrange
@@ -351,7 +351,7 @@ public class ErrorHandlingPartialFailuresAcceptanceTests : IDisposable
         Assert.Equal("BucketAlreadyExists", exception.ErrorCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task HeadBucketAsync_NonExistentBucket_ReturnsNoSuchBucket()
     {
         // Act & Assert
@@ -362,7 +362,7 @@ public class ErrorHandlingPartialFailuresAcceptanceTests : IDisposable
         Assert.Equal("NoSuchBucket", exception.ErrorCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task AmazonS3Exception_HasCorrectProperties()
     {
         // Arrange

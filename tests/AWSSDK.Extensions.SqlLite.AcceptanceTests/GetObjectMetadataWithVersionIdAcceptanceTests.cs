@@ -35,7 +35,7 @@ public class GetObjectMetadataWithVersionIdAcceptanceTests : IDisposable
         }
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectMetadataAsync_WithoutVersionId_ReturnsCurrentVersionMetadata()
     {
         // Arrange
@@ -62,7 +62,7 @@ public class GetObjectMetadataWithVersionIdAcceptanceTests : IDisposable
         Assert.NotEqual(default, response.LastModified);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectMetadataAsync_WithOlderVersionId_ReturnsOlderVersionMetadata()
     {
         // Arrange
@@ -91,7 +91,7 @@ public class GetObjectMetadataWithVersionIdAcceptanceTests : IDisposable
         Assert.Equal(putResponse1.VersionId, response.VersionId);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectMetadataAsync_CurrentVersionIsDeleteMarker_ThrowsException()
     {
         // Arrange
@@ -114,7 +114,7 @@ public class GetObjectMetadataWithVersionIdAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectMetadataAsync_DeleteMarkerVersionId_ReturnsMetadata()
     {
         // Arrange
@@ -144,7 +144,7 @@ public class GetObjectMetadataWithVersionIdAcceptanceTests : IDisposable
         Assert.NotEqual(default, response.LastModified);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectMetadataAsync_NonExistentVersionId_ThrowsException()
     {
         // Arrange
@@ -170,7 +170,7 @@ public class GetObjectMetadataWithVersionIdAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectMetadataAsync_VersionedBucket_ReturnsAllMetadataProperties()
     {
         // Arrange
@@ -200,7 +200,7 @@ public class GetObjectMetadataWithVersionIdAcceptanceTests : IDisposable
         Assert.NotEqual(default, response.LastModified);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectMetadataAsync_NonVersionedBucket_ReturnsMetadataWithNullVersionId()
     {
         // Arrange

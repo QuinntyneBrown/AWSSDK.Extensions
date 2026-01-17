@@ -35,7 +35,7 @@ public class MfaDeleteAcceptanceTests : IDisposable
         }
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutBucketVersioningAsync_EnableMfaDelete_Succeeds()
     {
         // Arrange
@@ -61,7 +61,7 @@ public class MfaDeleteAcceptanceTests : IDisposable
         Assert.True(getResponse.VersioningConfig.EnableMfaDelete);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteObjectAsync_WithMfaDeleteEnabled_SimpleDeleteSucceeds()
     {
         // Arrange
@@ -92,7 +92,7 @@ public class MfaDeleteAcceptanceTests : IDisposable
         Assert.Equal("true", deleteResponse.DeleteMarker);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetBucketVersioningAsync_WithMfaDeleteEnabled_ReportsMfaDeleteStatus()
     {
         // Arrange
@@ -116,7 +116,7 @@ public class MfaDeleteAcceptanceTests : IDisposable
         Assert.True(response.VersioningConfig.EnableMfaDelete);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutBucketVersioningAsync_DisableMfaDelete_Succeeds()
     {
         // Arrange
@@ -153,7 +153,7 @@ public class MfaDeleteAcceptanceTests : IDisposable
         Assert.False(getResponse.VersioningConfig.EnableMfaDelete);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task MfaDelete_IndependentOfVersioningStatus()
     {
         // Arrange
@@ -190,7 +190,7 @@ public class MfaDeleteAcceptanceTests : IDisposable
         Assert.True(response.VersioningConfig.EnableMfaDelete);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task MfaDelete_PersistsAfterVersioningReEnable()
     {
         // Arrange
@@ -238,7 +238,7 @@ public class MfaDeleteAcceptanceTests : IDisposable
         Assert.True(response.VersioningConfig.EnableMfaDelete);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task DeleteObjectAsync_WithoutMfaDelete_VersionDeletionSucceeds()
     {
         // Arrange
@@ -277,7 +277,7 @@ public class MfaDeleteAcceptanceTests : IDisposable
         Assert.DoesNotContain(listResponse.Versions, v => v.VersionId == putResponse.VersionId);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetBucketVersioningAsync_DefaultMfaDelete_IsDisabled()
     {
         // Arrange

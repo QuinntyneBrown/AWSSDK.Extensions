@@ -37,7 +37,7 @@ public class ConditionalWritesAcceptanceTests : IDisposable
 
     #region 2.1 PutObjectAsync with If-None-Match
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectAsync_IfNoneMatchStar_ObjectNotExists_Succeeds()
     {
         // Arrange
@@ -67,7 +67,7 @@ public class ConditionalWritesAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, getResponse.HttpStatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectAsync_IfNoneMatchStar_ObjectExists_FailsWithPreconditionFailed()
     {
         // Arrange
@@ -101,7 +101,7 @@ public class ConditionalWritesAcceptanceTests : IDisposable
         Assert.Equal("PreconditionFailed", exception.ErrorCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectAsync_ConcurrentWrites_FirstWriteWins()
     {
         // Arrange
@@ -141,7 +141,7 @@ public class ConditionalWritesAcceptanceTests : IDisposable
 
     #region 2.2 PutObjectAsync with If-Match (ETag validation)
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectAsync_IfMatchETag_Matches_Succeeds()
     {
         // Arrange
@@ -175,7 +175,7 @@ public class ConditionalWritesAcceptanceTests : IDisposable
         Assert.Equal("updated content", content);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectAsync_IfMatchETag_Mismatch_FailsWithPreconditionFailed()
     {
         // Arrange
@@ -202,7 +202,7 @@ public class ConditionalWritesAcceptanceTests : IDisposable
         Assert.Equal(HttpStatusCode.PreconditionFailed, exception.StatusCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectAsync_IfMatch_ObjectNotExists_Fails()
     {
         // Arrange
@@ -228,7 +228,7 @@ public class ConditionalWritesAcceptanceTests : IDisposable
 
     #region 2.3 Basic Write Operations (supporting tests)
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectAsync_GeneratesValidETag()
     {
         // Arrange
@@ -249,7 +249,7 @@ public class ConditionalWritesAcceptanceTests : IDisposable
         Assert.Matches("^[a-f0-9]+$", putResponse.ETag);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectAsync_SameContent_ProducesSameETag()
     {
         // Arrange
@@ -276,7 +276,7 @@ public class ConditionalWritesAcceptanceTests : IDisposable
         Assert.Equal(response1.ETag, response2.ETag);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectAsync_DifferentContent_ProducesDifferentETag()
     {
         // Arrange
@@ -302,7 +302,7 @@ public class ConditionalWritesAcceptanceTests : IDisposable
         Assert.NotEqual(response1.ETag, response2.ETag);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectAsync_VersionedBucket_ReturnsVersionId()
     {
         // Arrange

@@ -37,7 +37,7 @@ public class ObjectLockRetentionAcceptanceTests : IDisposable
 
     #region 5.1 PutObjectRetentionAsync
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectRetentionAsync_GovernanceMode_SetsRetention()
     {
         // Arrange
@@ -78,7 +78,7 @@ public class ObjectLockRetentionAcceptanceTests : IDisposable
         Assert.Equal("GOVERNANCE", getResponse.Retention?.Mode?.Value);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectRetentionAsync_ComplianceMode_SetsRetention()
     {
         // Arrange
@@ -119,7 +119,7 @@ public class ObjectLockRetentionAcceptanceTests : IDisposable
         Assert.Equal("COMPLIANCE", getResponse.Retention?.Mode?.Value);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectRetentionAsync_ExtendRetentionPeriod_Succeeds()
     {
         // Arrange
@@ -172,7 +172,7 @@ public class ObjectLockRetentionAcceptanceTests : IDisposable
         Assert.NotNull(getResponse.Retention?.RetainUntilDate);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectRetentionAsync_RemoveRetention_Succeeds()
     {
         // Arrange
@@ -218,7 +218,7 @@ public class ObjectLockRetentionAcceptanceTests : IDisposable
         Assert.Null(getResponse.Retention);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectRetentionAsync_NonExistentObject_ThrowsException()
     {
         // Arrange
@@ -246,7 +246,7 @@ public class ObjectLockRetentionAcceptanceTests : IDisposable
 
     #region 5.2 GetObjectRetentionAsync
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectRetentionAsync_ObjectWithRetention_ReturnsRetentionSettings()
     {
         // Arrange
@@ -285,7 +285,7 @@ public class ObjectLockRetentionAcceptanceTests : IDisposable
         Assert.NotNull(response.Retention?.RetainUntilDate);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectRetentionAsync_ObjectWithoutRetention_ReturnsNull()
     {
         // Arrange
@@ -311,7 +311,7 @@ public class ObjectLockRetentionAcceptanceTests : IDisposable
         Assert.Null(response.Retention);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task GetObjectRetentionAsync_NonExistentObject_ThrowsException()
     {
         // Arrange
@@ -330,7 +330,7 @@ public class ObjectLockRetentionAcceptanceTests : IDisposable
         Assert.Equal("NoSuchKey", exception.ErrorCode);
     }
 
-    [Fact(Skip = "SqlLite implementation pending")]
+    [Fact]
     public async Task PutObjectRetentionAsync_ValidModes_AcceptsBothGovernanceAndCompliance()
     {
         // Arrange
